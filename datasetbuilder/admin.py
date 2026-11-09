@@ -1,8 +1,11 @@
+from datetime import datetime, timezone
 from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 from flask_login import login_required, current_user
 from .models import db, User
 from .services import log_audit
 from .i18n import translate
+from .csv_export import csv_response
+from .pagination import PAGE_SIZE, current_page
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -16,8 +19,22 @@ def admin_only():
 @login_required
 def users():
     admin_only()
-    accounts = db.session.query(User).order_by(User.username.asc()).all()
+    accounts = (db.session.query(User).order_by(User.username.asc(), User.id.asc())
+                .paginate(page=current_page(), per_page=PAGE_SIZE, error_out=False))
     return render_template('users.html', accounts=accounts)
+
+
+@bp.get('/users.csv')
+@login_required
+def export_users_csv():
+    admin_only()
+    users = db.session.query(User).order_by(User.username.asc(), User.id.asc()).all()
+    rows = [[user.username, user.display_name, user.active, user.role] for user in users]
+    log_audit(current_user, 'export_users_csv', None, f'{len(rows)} users')
+    db.session.commit()
+    stamp = datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
+    return csv_response(f'DatasetBuilder-users-{stamp}.csv',
+                        ['username', 'display_name', 'active', 'role'], rows)
 
 
 @bp.post('/users')

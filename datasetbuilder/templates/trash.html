@@ -1,3 +1,17 @@
 {% extends 'base.html' %}
+{% from '_pagination.html' import pagination with context %}
 {% block title %}{{ t('trash') }}{% endblock %}
-{% block content %}<div class="wide-container"><div class="page-head"><div><div class="eyebrow">{{ t('archive_eyebrow')|upper }}</div><h1>{{ t('trash') }}</h1><p class="muted">{{ t('trashed_hint') }}</p></div></div><div class="surface"><div class="surface-header"><h2>{{ t('trash') }}</h2></div>{% if records %}<div class="table-responsive"><table class="table data-table"><thead><tr><th>{{ t('kb_code') }}</th><th>{{ t('title') }}</th><th>{{ t('deleted') }}</th><th></th></tr></thead><tbody>{% for doc in records %}<tr><td><span class="code-tag">{{ doc.kb_id }}</span></td><td>{{ doc.title }}</td><td>{{ doc.deleted_at.strftime('%Y-%m-%d %H:%M') }} UTC</td><td><form method="post" action="{{ url_for('main.restore_document', doc_id=doc.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-primary"><i class="fa-solid fa-arrow-rotate-left me-2"></i>{{ t('restore') }}</button></form></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><i class="fa-solid fa-trash-can"></i><p>{{ t('no_articles') }}</p></div>{% endif %}</div></div>{% endblock %}
+{% block content %}
+<div class="wide-container">
+  <div class="page-head"><div><div class="eyebrow">{{ t('archive_eyebrow')|upper }}</div><h1>{{ t('trash') }}</h1><p class="muted">{{ t('trashed_hint') }}</p></div></div>
+  <div class="surface">
+    <div class="surface-header"><h2>{{ t('trash') }}</h2><a class="btn btn-outline-light-custom" href="{{ url_for('main.export_trash_csv') }}"><i class="fa-solid fa-file-csv me-2"></i>{{ t('export_csv') }}</a></div>
+    {% if records.items %}
+    <div class="table-responsive"><table class="table data-table"><thead><tr><th>{{ t('kb_code') }}</th><th>{{ t('title') }}</th><th>{{ t('deleted') }}</th><th></th></tr></thead><tbody>
+      {% for doc in records.items %}<tr><td><span class="code-tag">{{ doc.kb_id }}</span></td><td>{{ doc.title }}</td><td>{{ doc.deleted_at.strftime('%Y-%m-%d %H:%M') }} UTC</td><td><form method="post" action="{{ url_for('main.restore_document', doc_id=doc.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-primary"><i class="fa-solid fa-arrow-rotate-left me-2"></i>{{ t('restore') }}</button></form></td></tr>{% endfor %}
+    </tbody></table></div>
+    {% else %}<div class="empty-state"><i class="fa-solid fa-trash-can"></i><p>{{ t('no_articles') }}</p></div>{% endif %}
+    {{ pagination(records, 'main.trash', {}) }}
+  </div>
+</div>
+{% endblock %}

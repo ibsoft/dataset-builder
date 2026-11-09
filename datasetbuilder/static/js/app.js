@@ -45,7 +45,6 @@
     return result;
   }};
   JSON.parse($('#db-flashes')?.textContent || '[]').forEach(([cat,msg])=>toast(cat==='message'?'info':cat,msg));
-  $('#import-md-input')?.addEventListener('change',e=>{if(e.target.files.length){toast('info',translations.importing_markdown||'Importing UTF-8 Markdown…');e.target.form.submit()}});
   $('#import-document')?.addEventListener('change',e=>{if(e.target.files.length){toast('info',translations.importing_markdown||'Importing UTF-8 Markdown…');e.target.form.submit()}});
   // Language switcher. Bound here rather than with an inline onchange handler,
   // which the Content-Security-Policy (script-src 'self') blocks.

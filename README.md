@@ -8,13 +8,19 @@ DatasetBuilder is a multi-user application for authoring, previewing, and versio
 
 The dark, responsive, three-panel editor offers Markdown formatting with CodeMirror (bold, italic, headings, links, ordered/unordered lists, quotes, code, code blocks, tables, undo/redo and keyboard shortcuts), a structured article outline, editable metadata, customizable sections, plus buttons between sections, one-click subsection insertion, drag-free up/down ordering, unlimited independent solutions, a full raw Markdown mode, and a **live server-rendered, HTML-sanitized preview**. Use **Ctrl/Cmd+S** to save.
 
-New records prepopulate *Problem Description, Possible Symptoms, Possible Causes, Diagnostic Procedure, Corrective Actions, Verification, Required Information for Further Diagnosis* and *Related Questions*, plus a solution template. Multiple solutions use a separate `## SOLUTIONS` heading and numbered `### Solution N: Name` subheadings, placed after Corrective Actions when it exists. Diagnostic `### Step ...` subheadings can be edited directly within a section.
+New records prepopulate *Problem Description, Possible Symptoms, TotalCare Messages, Possible Causes, Diagnostic Procedure, Corrective Actions, Verification, Required Information for Further Diagnosis* and *Related Questions*, plus a solution template. Existing articles are not modified; the new section is also available in the section picker. Multiple solutions use a separate `## SOLUTIONS` heading and numbered `### Solution N: Name` subheadings, placed after Corrective Actions when it exists. Diagnostic `### Step ...` subheadings can be edited directly within a section.
 
 Each article uses a unique stable ID based on the database sequence, with filenames such as `TC-KB-01-Kiosk_Communication_Lost.md` or `TC-KB-02-Απώλεια_Επικοινωνίας.md`. Spaces and punctuation become `_`, path separators are stripped, and Greek filenames/content are preserved as Unicode NFC UTF-8. Changing an article title updates the filename. Deleted articles go to a recoverable trash area (their `.md` mirror is removed).
 
 Every record remembers **Created By**, **Last Edited By**, revision number, and timestamps, embedded into the Markdown as well as stored in the database. Every save, deletion, restoration, and import becomes an immutable revision. The history screen provides previews, text diffs, downloads, and restore-as-new-version. ZIP export includes current `articles/`, deleted `trash/`, all `history/` revisions, and a UTF-8 `MANIFEST.json`. For direct RAG ingestion, use files under `articles/` only, and optionally filter on knowledge status.
 
 Users have **admin**, **editor** and **viewer** roles. Admins create/manage accounts. Editors can write, import, restore and delete. Viewers can browse/preview/download/export. The UI defaults to English, offers Greek (Ελληνικά) in the top bar and on the login page, and saves a user’s preference in **both their database settings and an HTTP-only language cookie**. The document language is independent of the interface language. Every meaningful save, delete, import, restore and settings change displays an upper-right toast. There are no background worker dependencies for normal editing.
+
+The articles, trash, revision history and users tables show 24 rows per page
+and offer CSV exports of all matching rows, not just the current page. The
+articles export applies the current search and status fields. Trash exports
+require editor access; user exports require administrator access and never
+include password hashes.
 
 ## Quick start: Linux / Ubuntu
 

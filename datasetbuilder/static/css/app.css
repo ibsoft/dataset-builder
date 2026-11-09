@@ -733,3 +733,15 @@ body.nav-collapsed .nav-collapse-btn i{transform:rotate(180deg)}
 .login-wrap{flex:1 1 auto}
 .login-lang-row .login-lang-form{margin:0}
 .login-card .input-icon .form-control:focus{border-color:rgba(125,145,180,.6);box-shadow:0 0 0 .12rem rgba(125,145,180,.14)}
+
+.users-page .form-control:-webkit-autofill,
+.users-page .form-control:-webkit-autofill:hover{
+  -webkit-text-fill-color:var(--t-edf2ff);
+  box-shadow:0 0 0 1000px var(--t-0c1527) inset;
+}
+.users-page .form-control:-webkit-autofill:focus{
+  -webkit-text-fill-color:var(--t-ffffff);
+  box-shadow:0 0 0 1000px var(--t-121c33) inset,0 0 0 .2rem var(--t-7e6ae4-a2a);
+}
+
+#solutions-container .solution-card + .solution-card{margin-top:16px}

@@ -17,6 +17,18 @@ def test_login_and_csrf_disabled_for_tests(login):
     assert b'DatasetBuilder' in client.get('/').data
 
 
+def test_dashboard_has_one_import_control_for_editors(login, viewer):
+    client = login()
+    for language in ('en', 'el'):
+        client.post('/language', data={'language': language, 'next': '/'})
+        body = client.get('/').data.decode('utf-8')
+        assert body.count('type="file"') == 1
+        assert 'action="/import"' in body
+        assert 'for="import-document"' in body
+        assert 'action="/documents/import"' not in body
+    assert 'type="file"' not in viewer.get('/').data.decode('utf-8')
+
+
 def test_viewer_cannot_read_deleted_article_by_id(login,viewer):
     """IDOR: a read-only viewer must not reach trashed content by guessing ids."""
     client=login()
@@ -146,6 +158,27 @@ def test_sidebar_collapse_control_is_present(login):
     assert 'nav-text' in body
 
 
+def test_user_management_password_fields_are_new_passwords(login):
+    client = login()
+    body = client.get('/admin/users').data.decode('utf-8')
+    assert 'class="wide-container users-page"' in body
+    assert body.count('autocomplete="new-password"') == 4
+    assert 'name="username" autocomplete="off"' in body
+
+
+def test_export_sidebar_has_localized_actions_section(login, viewer):
+    client = login()
+    for language, label in (('en', 'ACTIONS'), ('el', 'ΕΝΈΡΓΕΙΕΣ')):
+        client.post('/language', data={'language': language, 'next': '/'})
+        body = client.get('/').data.decode('utf-8')
+        section = body.split(f'<div class="sidebar-label mt-4">{label}</div>', 1)[1]
+        assert 'id="nav-export"' in section.split('</nav>', 1)[0]
+        assert body.count('id="nav-export"') == 1
+    body = viewer.get('/').data.decode('utf-8')
+    assert 'id="nav-export"' in body
+    assert 'ACTIONS' in body
+
+
 def test_delete_confirmation_modal_is_localized_and_available(login):
     client = login()
     _make(client)
@@ -192,6 +225,29 @@ def test_greek_translation_covers_editor_toolbar(login):
     assert strings['md_bold']=='Έντονη'
     assert strings['md_undo']=='Αναίρεση'
     assert strings['collapse_nav']=='Σύμπτυξη πλοήγησης'
+    assert strings['first_solution']=='Πρώτη λύση'
+
+
+def test_editor_receives_localized_default_section_labels(login):
+    from datasetbuilder.i18n import SECTION_UI, translate
+
+    client = login()
+    _make(client, text='# NEW: Test\n\n## PROBLEM DESCRIPTION\n\nText\n\n## Custom section\n\nText\n')
+    client.post('/language', data={'language': 'el', 'next': '/'})
+    for path in ('/documents/new', '/documents/1/edit'):
+        body = client.get(path).data.decode('utf-8')
+        match = re.search(r'<script id="editor-data" type="application/json">(.*?)</script>', body, re.S)
+        data = json.loads(match.group(1))
+        assert data['section_labels'] == {
+            title: translate(key, 'el') for title, key in SECTION_UI.items()
+        }
+        assert data['parsed']['sections'][0]['title'] == 'PROBLEM DESCRIPTION'
+        if path.endswith('/edit'):
+            assert data['parsed']['sections'][1]['title'] == 'Custom section'
+    client.post('/language', data={'language': 'en', 'next': '/'})
+    body = client.get('/documents/new').data.decode('utf-8')
+    match = re.search(r'<script id="editor-data" type="application/json">(.*?)</script>', body, re.S)
+    assert json.loads(match.group(1))['section_labels'] == {}
 
 
 def test_theme_toggle_persists_per_account(login,app):

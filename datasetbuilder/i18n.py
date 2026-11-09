@@ -1,7 +1,8 @@
 """English-first UI; all labels, prompts, tooltips and toasts can be translated."""
 EN = {
  'app':'DatasetBuilder','tagline':'RAG Knowledge Studio','dashboard':'Knowledge Base','articles':'Articles',
- 'new_article':'New article','settings':'Settings','users':'Users','trash':'Trash','export':'Export ZIP',
+ 'new_article':'New article','settings':'Settings','users':'Users','trash':'Trash','export':'Export ZIP','actions':'Actions',
+ 'export_csv':'Export CSV','pagination':'Pagination','page':'Page',
  'logout':'Sign out','login':'Sign in','username':'Username','password':'Password',
  'welcome':'Welcome back','login_subtitle':'Sign in to manage verified knowledge.',
  'search':'Search articles, categories and content...','all_statuses':'All statuses','no_articles':'No articles found.',
@@ -12,7 +13,7 @@ EN = {
  'delete':'Delete','restore':'Restore','cancel':'Cancel','back':'Back to articles',
  'preview':'Live preview','raw':'Markdown source','structured':'Structured editor',
  'sections':'Sections','add_section':'Add section','add_solution':'Add solution',
- 'solutions':'Solutions','solution_title':'Solution title','markdown_tip':'Supports full Markdown syntax',
+ 'solutions':'Solutions','first_solution':'First solution','solution_title':'Solution title','markdown_tip':'Supports full Markdown syntax',
  'metadata':'Metadata','knowledge_type':'Knowledge type','device_models':'Device models',
  'operational_status':'Operational status','knowledge_status':'Knowledge status','solution_status':'Solution status',
  'article_language':'Article language','revision_note':'Revision note (optional)',
@@ -43,7 +44,7 @@ EN = {
  'login_failed':'Incorrect username or password.','user_deleted':'User is inactive.',
  'choose_template':'Choose a section template','diagnostic':'Diagnostic procedure',
  'verification':'Verification','problem':'Problem description','cause':'Possible causes',
- 'symptoms':'Possible symptoms','corrective':'Corrective actions',
+ 'symptoms':'Possible symptoms','totalcare_messages':'TOTALCARE MESSAGES','corrective':'Corrective actions',
  'info':'Required information','questions':'Related questions','general':'Additional section',
  'delete_solution_button':'Delete solution','delete_section_button':'Delete section',
  'revision_warning':'Restoring adds a NEW revision; no history is erased.',
@@ -58,7 +59,8 @@ EN = {
 EL = {
  'app':'DatasetBuilder','tagline':'Εργαστήριο Γνώσης RAG','dashboard':'Βάση Γνώσης','articles':'Άρθρα',
  'new_article':'Νέο άρθρο','settings':'Ρυθμίσεις','users':'Χρήστες','trash':'Κάδος',
- 'export':'Εξαγωγή ZIP','logout':'Αποσύνδεση','login':'Σύνδεση','username':'Όνομα χρήστη',
+ 'export':'Εξαγωγή ZIP','actions':'Ενέργειες','export_csv':'Εξαγωγή CSV','pagination':'Σελιδοποίηση','page':'Σελίδα',
+ 'logout':'Αποσύνδεση','login':'Σύνδεση','username':'Όνομα χρήστη',
  'password':'Κωδικός πρόσβασης','welcome':'Καλώς ήρθατε','login_subtitle':'Συνδεθείτε για διαχείριση τεχνικής γνώσης.',
  'search':'Αναζήτηση σε άρθρα, κατηγορίες και περιεχόμενο...','all_statuses':'Όλες οι καταστάσεις',
  'no_articles':'Δεν βρέθηκαν άρθρα.','no_articles_hint':'Δημιουργήστε το πρώτο άρθρο σας.',
@@ -68,7 +70,7 @@ EL = {
  'view':'Προβολή','save':'Αποθήκευση αλλαγών','create':'Δημιουργία άρθρου','delete':'Διαγραφή',
  'restore':'Επαναφορά','cancel':'Ακύρωση','back':'Πίσω στα άρθρα','preview':'Ζωντανή προεπισκόπηση',
  'raw':'Κώδικας Markdown','structured':'Δομημένος επεξεργαστής','sections':'Ενότητες',
- 'add_section':'Προσθήκη ενότητας','add_solution':'Προσθήκη λύσης','solutions':'Λύσεις',
+ 'add_section':'Προσθήκη ενότητας','add_solution':'Προσθήκη λύσης','solutions':'Λύσεις','first_solution':'Πρώτη λύση',
  'solution_title':'Τίτλος λύσης','markdown_tip':'Υποστηρίζει πλήρη σύνταξη Markdown',
  'metadata':'Μεταδεδομένα','knowledge_type':'Τύπος γνώσης','device_models':'Μοντέλα συσκευών',
  'operational_status':'Λειτουργική κατάσταση','knowledge_status':'Κατάσταση γνώσης',
@@ -107,7 +109,7 @@ EL = {
  'login_failed':'Λανθασμένο όνομα ή κωδικός.','user_deleted':'Ο χρήστης είναι ανενεργός.',
  'choose_template':'Επιλέξτε πρότυπο ενότητας','diagnostic':'Διαγνωστική διαδικασία',
  'verification':'Επαλήθευση','problem':'Περιγραφή προβλήματος','cause':'Πιθανές αιτίες',
- 'symptoms':'Πιθανά συμπτώματα','corrective':'Διορθωτικές ενέργειες',
+ 'symptoms':'Πιθανά συμπτώματα','totalcare_messages':'Μηνύματα TotalCare','corrective':'Διορθωτικές ενέργειες',
  'info':'Απαιτούμενες πληροφορίες','questions':'Σχετικές ερωτήσεις',
  'general':'Πρόσθετη ενότητα','delete_solution_button':'Διαγραφή λύσης',
  'delete_section_button':'Διαγραφή ενότητας',
@@ -277,6 +279,7 @@ META_UI = {
 }
 SECTION_UI = {
  'PROBLEM DESCRIPTION':'problem','POSSIBLE SYMPTOMS':'symptoms',
+ 'TOTALCARE MESSAGES':'totalcare_messages',
  'POSSIBLE CAUSES':'cause','DIAGNOSTIC PROCEDURE':'diagnostic',
  'CORRECTIVE ACTIONS':'corrective','VERIFICATION':'verification',
  'REQUIRED INFORMATION FOR FURTHER DIAGNOSIS':'info','RELATED QUESTIONS':'questions',
@@ -313,5 +316,5 @@ def js_strings(lang='en'):
             'collapse_nav','expand_nav','importing_markdown','preparing_export','markdown_draft_downloaded',
             'md_bold','md_italic','md_heading','md_link','md_bullet_list','md_numbered_list',
             'md_inline_code','md_code_block','md_quote','md_table','md_undo','md_redo',
-            'section_label','solution_label','markdown_toolbar','untitled')
+            'section_label','solution_label','markdown_toolbar','untitled','first_solution')
     return {k: translate(k,lang) for k in keys}

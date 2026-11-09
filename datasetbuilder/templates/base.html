@@ -25,8 +25,11 @@
       {% if current_user.can_edit() %}
       <a class="menu-link {% if request.endpoint == 'main.new_document' %}active{% endif %}" href="{{ url_for('main.new_document') }}" title="{{ t('new_article') }}"><i class="fa-solid fa-square-plus"></i> <span class="nav-text">{{ t('new_article') }}</span></a>
       {% endif %}
-      <a class="menu-link" href="{{ url_for('main.export_zip') }}" id="nav-export" title="{{ t('export') }}"><i class="fa-solid fa-file-zipper"></i> <span class="nav-text">{{ t('export') }}</span></a>
       {% if current_user.can_edit() %}<a class="menu-link {% if request.endpoint == 'main.trash' %}active{% endif %}" href="{{ url_for('main.trash') }}" title="{{ t('trash') }}"><i class="fa-solid fa-trash-can"></i> <span class="nav-text">{{ t('trash') }}</span></a>{% endif %}
+    </nav>
+    <div class="sidebar-label mt-4">{{ t('actions')|upper }}</div>
+    <nav class="menu">
+      <a class="menu-link" href="{{ url_for('main.export_zip') }}" id="nav-export" title="{{ t('export') }}"><i class="fa-solid fa-file-zipper"></i> <span class="nav-text">{{ t('export') }}</span></a>
     </nav>
     <div class="sidebar-label mt-4">{{ t('account')|upper }}</div>
     <nav class="menu">

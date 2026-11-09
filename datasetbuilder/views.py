@@ -18,6 +18,7 @@ from .markdown_utils import (METADATA, DEFAULT_SECTIONS, parse_markdown,
 from .services import (ConflictError, create_document, save_document, delete_document,
                        undelete_document, restore_revision, log_audit)
 from .i18n import translate
+from .pagination import PAGE_SIZE, current_page
 
 bp = Blueprint('main', __name__)
 
@@ -67,9 +68,8 @@ def dashboard():
     q = request.args.get('q', '').strip()[:160]
     status = request.args.get('status', '').strip()[:60]
     query = _filtered_documents()
-    page = max(request.args.get('page', 1, type=int), 1)
     page_results = query.order_by(Document.updated_at.desc(), Document.id.desc()).paginate(
-        page=page, per_page=24, error_out=False)
+        page=current_page(), per_page=PAGE_SIZE, error_out=False)
     total = db.session.query(Document).filter(Document.deleted_at.is_(None)).count()
     published = db.session.query(Document).filter(Document.deleted_at.is_(None),
         Document.knowledge_status.in_(['Published', 'Approved'])).count()
@@ -162,7 +162,8 @@ def edit_document(doc_id):
 def history(doc_id):
     doc = get_doc_or_404(doc_id, include_deleted=True)
     revisions = (db.session.query(DocumentRevision).filter_by(document_id=doc.id)
-                 .order_by(DocumentRevision.number.desc()).all())
+                 .order_by(DocumentRevision.number.desc())
+                 .paginate(page=current_page(), per_page=PAGE_SIZE, error_out=False))
     return render_template('history.html', doc=doc, revisions=revisions)
 
 
@@ -273,7 +274,8 @@ def export_zip():
 def trash():
     can_edit()
     docs = (db.session.query(Document).filter(Document.deleted_at.is_not(None))
-            .order_by(Document.deleted_at.desc()).all())
+            .order_by(Document.deleted_at.desc(), Document.id.desc())
+            .paginate(page=current_page(), per_page=PAGE_SIZE, error_out=False))
     return render_template('trash.html', records=docs)
 
 
@@ -283,7 +285,7 @@ def export_trash_csv():
     """CSV of the articles listed in the trash."""
     can_edit()
     docs = (db.session.query(Document).filter(Document.deleted_at.is_not(None))
-            .order_by(Document.deleted_at.desc()).all())
+            .order_by(Document.deleted_at.desc(), Document.id.desc()).all())
     rows = [[doc.kb_id, doc.title, doc.category, doc.knowledge_status, doc.revision,
              doc.created_by.username, doc.updated_by.username, doc.created_at.isoformat(),
              doc.deleted_at.isoformat() if doc.deleted_at else '', doc.filename] for doc in docs]
