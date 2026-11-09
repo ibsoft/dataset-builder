@@ -38,6 +38,76 @@ Open `http://127.0.0.1:5000`. **Do not expose `flask run` on public networks.** 
 
 The default SQLite path is `data/datasetbuilder.sqlite` inside the project directory. The default Markdown output is `data/knowledge_base/` (configure it via `KB_DIRECTORY`). SQLite is suitable for evaluation/single-instance deployments but **PostgreSQL is strongly recommended for many concurrent editors**.
 
+## Native Linux service and updates
+
+On a systemd-based Linux host, run from a Git checkout as the user that should
+own and run the application (not root). Python 3.11+, Git, sudo and systemd
+are required. The installer offers to install missing nginx, rsync, curl and Python
+venv packages on apt-based systems; install them manually elsewhere.
+
+```bash
+./scripts/setup.sh
+```
+
+Choose an installation directory when prompted (default `/opt/dataset-builder`);
+for automation pass an absolute path: `./scripts/setup.sh install /opt/dataset-builder`.
+The directory must not already exist. The installer copies the checkout,
+including its `.env` and `data/`, creates a fresh virtual environment, installs
+Python requirements, migrates the database, and enables a systemd service.
+Stop any running source application before copying its SQLite database and
+knowledge files. The source checkout is not modified. Absolute database and
+knowledge paths in `.env` are preserved as-is and continue to point to their
+original locations; ensure the service user can access them. If `.env` is absent,
+setup creates one with a random secret and secure cookies. Existing settings are
+never replaced: set `COOKIE_SECURE=1` for HTTPS if necessary. The service runs
+as the invoking user and binds to `127.0.0.1:8000`. It uses one Gunicorn worker;
+configure Redis in `.env` before using multiple workers or instances.
+Setup and updates check the local HTTP/database health endpoint before reporting
+success. The installer refuses an existing service or nginx site rather than
+overwriting another installation.
+
+Create the first administrator if the copied database does not already have one:
+
+```bash
+cd /opt/dataset-builder
+APP_ENV=production .venv/bin/flask --app wsgi.py create-admin
+```
+
+Control the installation from its home directory:
+
+```bash
+./datase-ctl start
+./datase-ctl stop
+./datase-ctl status
+./datase-ctl logs    # follow the systemd journal
+./datase-ctl update
+./datase-ctl debug   # service status, recent logs, database and HTTP health
+```
+
+Update fetches the source branch's configured upstream and fast-forwards only,
+stops the service, preserves the
+existing `.env` and entire `data/` directory (including tracked and untracked
+files), installs dependencies, migrates the configured database and starts
+the service. It refuses staged changes, tracked changes outside `data/`,
+non-fast-forward updates, and updates touching a configured SQLite database
+or knowledge directory outside `data/`. Local uncommitted code copied from the
+source checkout remains uncommitted and must be committed or otherwise handled
+before updating. Other Git conflicts also stop the
+update. The service stays stopped if an update fails after it is stopped;
+inspect the error and fix it before restarting. Migrations may modify the
+database: **back up the database and knowledge directory before updating**.
+For PostgreSQL, use a database-native backup such as `pg_dump`; `.env` and
+external data paths are not database backups.
+
+The installer installs and enables the [nginx site](scripts/datasetbuilder.nginx.conf)
+for `dataset-builder.unixfor.gr` on Debian-style nginx installations. It
+redirects HTTP to HTTPS and requires the existing certificate
+`/opt/ssl/unixfor.crt` and key `/opt/ssl/unixfor.key`. Setup refuses to
+overwrite an existing site, runs `nginx -t`, and reloads nginx only on success.
+Check DNS, certificate hostname coverage, and nginx's other sites before
+exposing the service. A failed installation may leave the new installation
+directory or service in place; inspect it before retrying.
+
 ## Production: Docker Compose (PostgreSQL + Redis + Gunicorn)
 
 1. Copy `.env.example` to `.env`. Set a random `SECRET_KEY` (64+ hex characters is fine) and a strong URL-safe `POSTGRES_PASSWORD` with no `@`, `:`, `/` or `?`. Set `COOKIE_SECURE=1` when accessed through HTTPS. Do not publish `.env`.

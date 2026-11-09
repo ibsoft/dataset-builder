@@ -203,7 +203,7 @@
     // CodeMirror needs refresh after the DOM nodes have been connected.
     setTimeout(()=>cardEditors.forEach(cm=>cm.refresh()),20);
   }
-  function mutate(type,index,action) {
+  async function mutate(type,index,action) {
     const arr = type==='solution'?solutions:sections;
     if (action==='subsection') {
       arr[index].body += (arr[index].body.endsWith('\n')?'':'\n')+'\n### New subsection\n\n';
@@ -211,8 +211,11 @@
       return;
     }
     if (action==='remove') {
-      if(!confirm(t(type==='solution'?'delete_solution':'delete_section'))) return;
-      arr.splice(index,1);
+      const entry = arr[index];
+      if(!await window.DB.confirmDelete(t(type==='solution'?'delete_solution':'delete_section'))) return;
+      const currentIndex = arr.indexOf(entry);
+      if(currentIndex < 0) return;
+      arr.splice(currentIndex,1);
       window.toastr.info(type==='solution'?t('delete_solution_button'):t('delete_section_button'));
     } else if(action==='up' && index>0) {
       [arr[index],arr[index-1]]=[arr[index-1],arr[index]];

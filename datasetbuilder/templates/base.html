@@ -54,6 +54,21 @@
   </footer>
 </main>
 <div class="toast-container position-fixed top-0 end-0 p-4" id="toast-container" style="z-index:11000;"></div>
+<div class="modal fade" id="delete-confirm-modal" tabindex="-1" aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-message" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content dark-modal">
+      <div class="modal-header">
+        <h5 class="modal-title" id="delete-confirm-title">{{ t('delete') }}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{{ t('cancel') }}"></button>
+      </div>
+      <div class="modal-body" id="delete-confirm-message"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-light-custom" id="delete-confirm-cancel" data-bs-dismiss="modal">{{ t('cancel') }}</button>
+        <button type="button" class="btn btn-danger" id="delete-confirm-accept">{{ t('delete') }}</button>
+      </div>
+    </div>
+  </div>
+</div>
 <script id="db-strings" type="application/json">{{ ui_strings|tojson }}</script>
 <script id="db-flashes" type="application/json">{{ get_flashed_messages(with_categories=true)|tojson }}</script>
 <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>

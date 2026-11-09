@@ -17,7 +17,28 @@
     const inst = new bootstrap.Toast(el,{delay:4500});el.addEventListener('hidden.bs.toast',()=>el.remove());inst.show();
   };
   window.toastr = {success:m=>toast('success',m),error:m=>toast('error',m),warning:m=>toast('warning',m),info:m=>toast('info',m)};
-  window.DB = {csrf, t:(k)=>translations[k]||k, escapeHTML, toast, async api(url, options={}) {
+  const deleteModalElement = $('#delete-confirm-modal');
+  const deleteModal = bootstrap.Modal.getOrCreateInstance(deleteModalElement);
+  let pendingDelete = null;
+  let deleteAccepted = false;
+  let deleteTrigger = null;
+  deleteModalElement.addEventListener('shown.bs.modal',()=>$('#delete-confirm-cancel').focus());
+  $('#delete-confirm-accept').addEventListener('click',()=>{deleteAccepted=true;deleteModal.hide();});
+  deleteModalElement.addEventListener('hidden.bs.modal',()=>{
+    const resolve = pendingDelete;
+    pendingDelete = null;
+    if(deleteTrigger?.isConnected)deleteTrigger.focus();
+    deleteTrigger = null;
+    if(resolve)resolve(deleteAccepted);
+  });
+  const confirmDelete = (message) => {
+    if(pendingDelete)return Promise.resolve(false);
+    deleteAccepted = false;
+    deleteTrigger = document.activeElement;
+    $('#delete-confirm-message').textContent = message;
+    return new Promise(resolve=>{pendingDelete=resolve;deleteModal.show();});
+  };
+  window.DB = {csrf, t:(k)=>translations[k]||k, escapeHTML, toast, confirmDelete, async api(url, options={}) {
     const response = await fetch(url,{...options,headers:{'Content-Type':'application/json','X-CSRFToken':csrf,...(options.headers||{})},credentials:'same-origin'});
     let result;try{result=await response.json()}catch{result={error:`HTTP ${response.status}`}}
     if (!response.ok) {const e = new Error(result.error || `HTTP ${response.status}`);e.status=response.status;e.data=result;throw e;}
@@ -69,8 +90,8 @@
     finally{button.disabled=false;}
   });
   $('#delete-document')?.addEventListener('click',async(event)=>{
-    if(!confirm(translations.confirm_delete||'Move this article to trash?'))return;
     const btn = event.currentTarget;
+    if(!await confirmDelete(translations.confirm_delete||'Move this article to trash?'))return;
     btn.disabled = true;
     try {const result=await window.DB.api(`/api/documents/${btn.dataset.id}`,{method:'DELETE',body:JSON.stringify({revision:Number(btn.dataset.revision)})});toast('success',translations.file_deleted||'Moved to trash');setTimeout(()=>location.assign(result.redirect),800)}
     catch(err){toast('error',err.message);btn.disabled=false;}
