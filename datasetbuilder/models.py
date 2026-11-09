@@ -13,6 +13,15 @@ def utcnow():
 db = SQLAlchemy()
 
 
+class DefaultSection(db.Model):
+    __tablename__ = "default_sections"
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(120), nullable=False)
+    title_key = db.Column(db.String(400), nullable=False, unique=True)
+    greek_label = db.Column(db.String(120), nullable=False)
+    position = db.Column(db.Integer, nullable=False)
+
+
 class User(UserMixin, db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)

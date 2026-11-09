@@ -1,6 +1,8 @@
 import pytest
 from datasetbuilder import create_app
-from datasetbuilder.models import db, User
+from datasetbuilder.models import db, User, DefaultSection
+from datasetbuilder.markdown_utils import DEFAULT_SECTIONS
+from datasetbuilder.i18n import SECTION_UI, translate
 
 @pytest.fixture()
 def app(tmp_path):
@@ -16,6 +18,11 @@ def app(tmp_path):
     # in user would leak from one request to the next.
     with app.app_context():
         db.create_all()
+        db.session.add_all([
+            DefaultSection(title=title, title_key=title.casefold(),
+                           greek_label=translate(SECTION_UI[title], 'el'), position=position)
+            for position, title in enumerate(DEFAULT_SECTIONS)
+        ])
         admin = User(username='admin', display_name='Administrator', role='admin')
         admin.set_password('SuperSecurePassword2026!')
         greek = User(username='eleni', display_name='Ελένη', role='editor')

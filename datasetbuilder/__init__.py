@@ -82,7 +82,7 @@ def create_app(test_config=None):
                  else request.cookies.get('datasetbuilder_theme', 'dark'))
         g.ui_theme = theme if theme in ('dark', 'light') else 'dark'
 
-    from .i18n import translate, translate_value, js_strings, META_UI, SECTION_UI
+    from .i18n import translate, translate_value, js_strings, META_UI
     from .markdown_utils import METADATA_CHOICES
     @app.context_processor
     def template_context():
@@ -91,9 +91,7 @@ def create_app(test_config=None):
                 'ui_lang': getattr(g, 'ui_lang', 'en'),
                 'ui_theme': getattr(g, 'ui_theme', 'dark'),
                 'ui_strings': js_strings(getattr(g, 'ui_lang', 'en')),
-                'meta_ui': META_UI, 'section_ui': SECTION_UI,
-                'section_labels': {title: translate(key, 'el') for title, key in SECTION_UI.items()}
-                    if getattr(g, 'ui_lang', 'en') == 'el' else {},
+                'meta_ui': META_UI,
                 'meta_choices': METADATA_CHOICES,
                 # Rendered server-side so the navigation rail has its final width
                 # on the first paint instead of being resized by JavaScript.

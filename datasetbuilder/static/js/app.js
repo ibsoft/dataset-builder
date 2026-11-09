@@ -69,6 +69,10 @@
   applyNav(navCollapsed());
   navCollapse?.addEventListener('click',()=>{const next=!navCollapsed();applyNav(next);setNavCookie(next);});
   document.querySelectorAll('[data-confirm]').forEach(form=>form.addEventListener('submit',e=>{if(!confirm(form.dataset.confirm))e.preventDefault()}));
+  document.querySelectorAll('[data-confirm-delete]').forEach(form=>form.addEventListener('submit',async e=>{
+    e.preventDefault();
+    if(await confirmDelete(form.dataset.confirmDelete))form.submit();
+  }));
   document.querySelectorAll('#nav-export,.btn[href="/export"]').forEach(a=>a.addEventListener('click',()=>toast('info',translations.preparing_export||'Preparing UTF-8 ZIP export…')));
   $('#print-document')?.addEventListener('click',()=>window.print());
   // Theme switch. The theme is stored per account (and in a cookie so it also
