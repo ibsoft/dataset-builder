@@ -10,14 +10,15 @@ from flask import (Blueprint, abort, current_app, flash, g, jsonify, session,
                    redirect, render_template, request, send_file, url_for)
 from flask_login import current_user, login_required
 from sqlalchemy import or_
-from .models import db, Document, DocumentRevision
+from .models import db, Document, DocumentRevision, DefaultSection
 from .csv_export import csv_response
 from .access import can_read, get_document, get_revision
-from .markdown_utils import (METADATA, DEFAULT_SECTIONS, parse_markdown,
+from .markdown_utils import (METADATA, parse_markdown,
                              build_markdown, render_preview, KNOWLEDGE_STATUS_VALUES)
 from .services import (ConflictError, create_document, save_document, delete_document,
                        undelete_document, restore_revision, log_audit)
-from .i18n import translate
+from .i18n import translate, SECTION_UI
+from .pagination import PAGE_SIZE, current_page
 
 bp = Blueprint('main', __name__)
 
@@ -67,9 +68,8 @@ def dashboard():
     q = request.args.get('q', '').strip()[:160]
     status = request.args.get('status', '').strip()[:60]
     query = _filtered_documents()
-    page = max(request.args.get('page', 1, type=int), 1)
     page_results = query.order_by(Document.updated_at.desc(), Document.id.desc()).paginate(
-        page=page, per_page=24, error_out=False)
+        page=current_page(), per_page=PAGE_SIZE, error_out=False)
     total = db.session.query(Document).filter(Document.deleted_at.is_(None)).count()
     published = db.session.query(Document).filter(Document.deleted_at.is_(None),
         Document.knowledge_status.in_(['Published', 'Approved'])).count()
@@ -94,9 +94,9 @@ def export_articles_csv():
     return csv_response(f'DatasetBuilder-articles-{stamp}.csv', headers, rows)
 
 
-def default_markdown(title='Untitled problem', kb='TC-KB-NEW'):
+def default_markdown(default_sections, title='Untitled problem', kb='TC-KB-NEW'):
     metadata = {key: default for key, default in METADATA}
-    sections = [{'title': name, 'body': ''} for name in DEFAULT_SECTIONS]
+    sections = [{'title': section.title, 'body': ''} for section in default_sections]
     # New documents include a solution template ready to fill in.
     solutions = [{'title': 'First solution', 'body': '**Prerequisites:**\n\n**Resolution steps:**\n\n1. \n\n**Expected result:**'}]
     return build_markdown(title, kb, metadata, '', sections, solutions)
@@ -136,9 +136,17 @@ def import_document():
 @login_required
 def new_document():
     can_edit()
-    raw = default_markdown()
+    sections = db.session.query(DefaultSection).order_by(DefaultSection.position, DefaultSection.id).all()
+    raw = default_markdown(sections)
     return render_template('editor.html', doc=None, raw=raw, parsed=parse_markdown(raw),
-                           default_sections=DEFAULT_SECTIONS, metadata_fields=METADATA)
+                           **editor_sections(sections), metadata_fields=METADATA)
+
+
+def editor_sections(sections):
+    labels = {title: translate(key, 'el') for title, key in SECTION_UI.items()} if g.ui_lang == 'el' else {}
+    if g.ui_lang == 'el':
+        labels.update({section.title: section.greek_label for section in sections})
+    return {'default_sections': sections, 'section_labels': labels}
 
 
 @bp.get('/documents/<int:doc_id>')
@@ -153,8 +161,9 @@ def show_document(doc_id):
 def edit_document(doc_id):
     can_edit()
     doc = get_doc_or_404(doc_id)
+    sections = db.session.query(DefaultSection).order_by(DefaultSection.position, DefaultSection.id).all()
     return render_template('editor.html', doc=doc, raw=doc.markdown, parsed=parse_markdown(doc.markdown),
-                           default_sections=DEFAULT_SECTIONS, metadata_fields=METADATA)
+                           **editor_sections(sections), metadata_fields=METADATA)
 
 
 @bp.get('/documents/<int:doc_id>/history')
@@ -162,7 +171,8 @@ def edit_document(doc_id):
 def history(doc_id):
     doc = get_doc_or_404(doc_id, include_deleted=True)
     revisions = (db.session.query(DocumentRevision).filter_by(document_id=doc.id)
-                 .order_by(DocumentRevision.number.desc()).all())
+                 .order_by(DocumentRevision.number.desc())
+                 .paginate(page=current_page(), per_page=PAGE_SIZE, error_out=False))
     return render_template('history.html', doc=doc, revisions=revisions)
 
 
@@ -273,7 +283,8 @@ def export_zip():
 def trash():
     can_edit()
     docs = (db.session.query(Document).filter(Document.deleted_at.is_not(None))
-            .order_by(Document.deleted_at.desc()).all())
+            .order_by(Document.deleted_at.desc(), Document.id.desc())
+            .paginate(page=current_page(), per_page=PAGE_SIZE, error_out=False))
     return render_template('trash.html', records=docs)
 
 
@@ -283,7 +294,7 @@ def export_trash_csv():
     """CSV of the articles listed in the trash."""
     can_edit()
     docs = (db.session.query(Document).filter(Document.deleted_at.is_not(None))
-            .order_by(Document.deleted_at.desc()).all())
+            .order_by(Document.deleted_at.desc(), Document.id.desc()).all())
     rows = [[doc.kb_id, doc.title, doc.category, doc.knowledge_status, doc.revision,
              doc.created_by.username, doc.updated_by.username, doc.created_at.isoformat(),
              doc.deleted_at.isoformat() if doc.deleted_at else '', doc.filename] for doc in docs]

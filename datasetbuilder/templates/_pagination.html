@@ -1,0 +1,17 @@
+{% macro pagination(records, endpoint, params) %}
+{% if records.pages > 1 %}
+<nav class="pagination-wrap" aria-label="{{ t('pagination') }}">
+  <ul class="pagination pagination-sm mb-0">
+    {% for page in records.iter_pages() %}
+    {% if page %}
+    <li class="page-item {% if page == records.page %}active{% endif %}">
+      <a class="page-link" href="{{ url_for(endpoint, page=page, **params) }}" aria-label="{{ t('page') }} {{ page }}"{% if page == records.page %} aria-current="page"{% endif %}>{{ page }}</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">…</span></li>
+    {% endif %}
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+{% endmacro %}

@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}{{ t('manage_sections') }}{% endblock %}
+{% block content %}
+<div class="wide-container">
+  <div class="page-head"><div><div class="eyebrow">{{ t('access_eyebrow')|upper }}</div><h1>{{ t('manage_sections') }}</h1><p class="muted">{{ t('section_admin_help') }}</p></div></div>
+  <div class="surface form-surface mb-4">
+    <h2>{{ t('section_add') }}</h2>
+    <form method="post" action="{{ url_for('admin.create_section') }}" class="row g-3 mt-1">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-5"><label class="form-label" for="new-section-title">{{ t('section_english') }}</label><input id="new-section-title" class="form-control" name="title" maxlength="120" required></div>
+      <div class="col-md-5"><label class="form-label" for="new-section-greek">{{ t('section_greek') }}</label><input id="new-section-greek" class="form-control" name="greek_label" maxlength="120" required></div>
+      <div class="col-md-2 align-self-end"><button class="btn btn-primary w-100">{{ t('add_section') }}</button></div>
+    </form>
+  </div>
+  {% for section in sections %}
+  <div class="surface form-surface mb-3">
+    <form id="section-edit-{{ section.id }}" method="post" action="{{ url_for('admin.update_section', section_id=section.id, action='save') }}" class="row g-3 align-items-end">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-4"><label class="form-label" for="section-title-{{ section.id }}">{{ t('section_english') }}</label><input id="section-title-{{ section.id }}" class="form-control" name="title" value="{{ section.title }}" maxlength="120" required></div>
+      <div class="col-md-4"><label class="form-label" for="section-greek-{{ section.id }}">{{ t('section_greek') }}</label><input id="section-greek-{{ section.id }}" class="form-control" name="greek_label" value="{{ section.greek_label }}" maxlength="120" required></div>
+      <div class="col-md-4 d-flex gap-2 flex-wrap"><button class="btn btn-primary">{{ t('save') }}</button>
+        <button type="submit" class="btn btn-outline-light-custom" formaction="{{ url_for('admin.update_section', section_id=section.id, action='up') }}" formnovalidate title="{{ t('move_up') }}" aria-label="{{ t('move_up') }}" {% if loop.first %}disabled{% endif %}><i class="fa-solid fa-arrow-up"></i></button>
+        <button type="submit" class="btn btn-outline-light-custom" formaction="{{ url_for('admin.update_section', section_id=section.id, action='down') }}" formnovalidate title="{{ t('move_down') }}" aria-label="{{ t('move_down') }}" {% if loop.last %}disabled{% endif %}><i class="fa-solid fa-arrow-down"></i></button>
+        <button type="submit" form="section-delete-{{ section.id }}" class="btn btn-outline-danger">{{ t('delete') }}</button>
+      </div>
+    </form>
+    <form id="section-delete-{{ section.id }}" method="post" action="{{ url_for('admin.update_section', section_id=section.id, action='delete') }}" data-confirm-delete="{{ t('section_delete_confirm') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

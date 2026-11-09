@@ -1,3 +1,15 @@
 {% extends 'base.html' %}
+{% from '_pagination.html' import pagination with context %}
 {% block title %}{{ t('history') }}{% endblock %}
-{% block content %}<div class="wide-container"><div class="page-head"><div><a class="back-link" href="{{ url_for('main.show_document', doc_id=doc.id) }}"><i class="fa-solid fa-arrow-left"></i> {{ t('back') }}</a><div class="eyebrow mt-4">{{ doc.kb_id }} · {{ t('history') }}</div><h1>{{ doc.title }}</h1><p class="muted">{{ t('revision_warning') }}</p></div></div><div class="surface"><div class="surface-header"><h2>{{ t('history') }}</h2><span class="code-tag">v{{ doc.revision }}</span></div><div class="table-responsive"><table class="table data-table"><thead><tr><th>{{ t('revision') }}</th><th>{{ t('action') }}</th><th>{{ t('author') }}</th><th>{{ t('date') }}</th><th>{{ t('revision_note') }}</th><th></th></tr></thead><tbody>{% for rev in revisions %}<tr><td><span class="code-tag">v{{ rev.number }}</span></td><td>{{ t('revision_action_' + rev.action) }}</td><td>{{ rev.edited_by.display_name }}</td><td>{{ rev.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</td><td class="muted">{{ rev.note }}</td><td><a class="btn btn-sm btn-outline-light-custom" href="{{ url_for('main.history_revision', doc_id=doc.id, revision_id=rev.id) }}">{{ t('view') }} <i class="fa-solid fa-arrow-right ms-1"></i></a></td></tr>{% endfor %}</tbody></table></div></div></div>{% endblock %}
+{% block content %}
+<div class="wide-container">
+  <div class="page-head"><div><a class="back-link" href="{{ url_for('main.show_document', doc_id=doc.id) }}"><i class="fa-solid fa-arrow-left"></i> {{ t('back') }}</a><div class="eyebrow mt-4">{{ doc.kb_id }} · {{ t('history') }}</div><h1>{{ doc.title }}</h1><p class="muted">{{ t('revision_warning') }}</p></div></div>
+  <div class="surface">
+    <div class="surface-header"><h2>{{ t('history') }}</h2><div class="d-flex align-items-center gap-2"><span class="code-tag">v{{ doc.revision }}</span><a class="btn btn-outline-light-custom" href="{{ url_for('main.export_history_csv', doc_id=doc.id) }}"><i class="fa-solid fa-file-csv me-2"></i>{{ t('export_csv') }}</a></div></div>
+    <div class="table-responsive"><table class="table data-table"><thead><tr><th>{{ t('revision') }}</th><th>{{ t('action') }}</th><th>{{ t('author') }}</th><th>{{ t('date') }}</th><th>{{ t('revision_note') }}</th><th></th></tr></thead><tbody>
+      {% for rev in revisions.items %}<tr><td><span class="code-tag">v{{ rev.number }}</span></td><td>{{ t('revision_action_' + rev.action) }}</td><td>{{ rev.edited_by.display_name }}</td><td>{{ rev.created_at.strftime('%Y-%m-%d %H:%M') }} UTC</td><td class="muted">{{ rev.note }}</td><td><a class="btn btn-sm btn-outline-light-custom" href="{{ url_for('main.history_revision', doc_id=doc.id, revision_id=rev.id) }}">{{ t('view') }} <i class="fa-solid fa-arrow-right ms-1"></i></a></td></tr>{% endfor %}
+    </tbody></table></div>
+    {{ pagination(revisions, 'main.history', {'doc_id': doc.id}) }}
+  </div>
+</div>
+{% endblock %}

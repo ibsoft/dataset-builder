@@ -8,6 +8,8 @@
   const E = window.DB.escapeHTML;
   const t = window.DB.t;
   const data = JSON.parse($('#editor-data').textContent);
+  const sectionLabel = title => Object.prototype.hasOwnProperty.call(data.section_labels, title)
+    ? data.section_labels[title] : title;
   const copy = obj => JSON.parse(JSON.stringify(obj));
   let docId = data.id;
   let revision = data.revision;
@@ -177,8 +179,8 @@
   }
   function refreshNav() {
     const sectionsNav = $('#section-nav'),solutionsNav = $('#solution-nav');
-    sectionsNav.innerHTML = sections.map((section,i) => `<button type="button" class="outline-item" data-kind="section" data-index="${i}"><span class="outline-n">${String(i+1).padStart(2,'0')}</span><span>${E(section.title||t('untitled'))}</span></button>`).join('');
-    solutionsNav.innerHTML = solutions.map((solution,i) => `<button type="button" class="outline-item" data-kind="solution" data-index="${i}"><span class="outline-n solution-n">S${i+1}</span><span>${E(solution.title||t('untitled'))}</span></button>`).join('');
+    sectionsNav.innerHTML = sections.map((section,i) => `<button type="button" class="outline-item" data-kind="section" data-index="${i}"><span class="outline-n">${String(i+1).padStart(2,'0')}</span><span>${E(sectionLabel(section.title)||t('untitled'))}</span></button>`).join('');
+    solutionsNav.innerHTML = solutions.map((solution,i) => `<button type="button" class="outline-item" data-kind="solution" data-index="${i}"><span class="outline-n solution-n">S${i+1}</span><span>${E((solution.title === 'First solution' ? t('first_solution') : solution.title)||t('untitled'))}</span></button>`).join('');
     $$('.outline-item').forEach(button=>button.addEventListener('click',()=>{
       $(`#${button.dataset.kind}-block-${button.dataset.index}`)?.scrollIntoView({behavior:'smooth',block:'center'});
       markSelected(button.dataset.kind,+button.dataset.index);
