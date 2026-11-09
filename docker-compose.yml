@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: datasetbuilder
+      POSTGRES_USER: datasetbuilder
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U datasetbuilder -d datasetbuilder"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks: [internal]
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    networks: [internal]
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://datasetbuilder:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/datasetbuilder
+      KB_DIRECTORY: /app/data/knowledge_base
+      RATELIMIT_STORAGE_URI: redis://redis:6379/0
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - knowledge_data:/app/data/knowledge_base
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks: [internal]
+networks:
+  internal:
+volumes:
+  postgres_data:
+  knowledge_data:

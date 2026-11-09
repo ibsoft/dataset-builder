@@ -1,0 +1,17 @@
+Flask>=3.1,<4
+Flask-SQLAlchemy>=3.1,<4
+Flask-Login>=0.6.3,<0.7
+Flask-WTF>=1.2,<2
+Flask-Migrate>=4.0,<5
+Flask-Limiter>=3.10,<5
+SQLAlchemy>=2.0,<3
+alembic>=1.14,<2
+Markdown>=3.7,<4
+bleach>=6.2,<7
+filelock>=3.16,<4
+python-dotenv>=1.0,<2
+psycopg[binary]>=3.2,<4
+Gunicorn>=23,<24
+Flask-Migrate>=4.0,<5
+redis>=5.2,<7
+redis>=5,<7

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="{{ ui_lang }}" data-theme="{{ ui_theme }}">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}DatasetBuilder{% endblock %} · DatasetBuilder</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/print.css') }}" media="print">
+  {% block styles %}{% endblock %}
+</head>
+<body class="{% if current_user.is_authenticated %}app-shell{% else %}login-shell{% endif %}{% if nav_collapsed %} nav-collapsed{% endif %}">
+{% if current_user.is_authenticated %}
+  <aside class="sidebar" id="appSidebar">
+    <button type="button" class="nav-collapse-btn" id="nav-collapse" aria-controls="appSidebar" aria-expanded="true" title="{{ t('collapse_nav') }}"><i class="fa-solid fa-chevron-left"></i></button>
+    <a class="brand" href="{{ url_for('main.dashboard') }}">
+      <span class="brand-icon"><i class="fa-solid fa-layer-group"></i></span>
+      <span class="brand-text"><strong>DatasetBuilder</strong><small>{{ t('tagline') }}</small></span>
+    </a>
+    <div class="sidebar-label">{{ t('workspace')|upper }}</div>
+    <nav class="menu">
+      <a class="menu-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}" href="{{ url_for('main.dashboard') }}" title="{{ t('dashboard') }}"><i class="fa-solid fa-table-cells-large"></i> <span class="nav-text">{{ t('dashboard') }}</span></a>
+      {% if current_user.can_edit() %}
+      <a class="menu-link {% if request.endpoint == 'main.new_document' %}active{% endif %}" href="{{ url_for('main.new_document') }}" title="{{ t('new_article') }}"><i class="fa-solid fa-square-plus"></i> <span class="nav-text">{{ t('new_article') }}</span></a>
+      {% endif %}
+      <a class="menu-link" href="{{ url_for('main.export_zip') }}" id="nav-export" title="{{ t('export') }}"><i class="fa-solid fa-file-zipper"></i> <span class="nav-text">{{ t('export') }}</span></a>
+      {% if current_user.can_edit() %}<a class="menu-link {% if request.endpoint == 'main.trash' %}active{% endif %}" href="{{ url_for('main.trash') }}" title="{{ t('trash') }}"><i class="fa-solid fa-trash-can"></i> <span class="nav-text">{{ t('trash') }}</span></a>{% endif %}
+    </nav>
+    <div class="sidebar-label mt-4">{{ t('account')|upper }}</div>
+    <nav class="menu">
+      <a class="menu-link {% if request.endpoint == 'main.settings' %}active{% endif %}" href="{{ url_for('main.settings') }}" title="{{ t('settings') }}"><i class="fa-solid fa-sliders"></i> <span class="nav-text">{{ t('settings') }}</span></a>
+      {% if current_user.is_admin() %}<a class="menu-link {% if request.endpoint == 'admin.users' %}active{% endif %}" href="{{ url_for('admin.users') }}" title="{{ t('users') }}"><i class="fa-solid fa-users-gear"></i> <span class="nav-text">{{ t('users') }}</span></a>{% endif %}
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-avatar">{{ current_user.display_name[:1]|upper }}</div>
+      <div class="user-mini"><b>{{ current_user.display_name }}</b><small>{{ t('account_role_'+current_user.role) }} · {{ 'EL' if ui_lang == 'el' else 'EN' }}</small></div>
+      <form method="post" action="{{ url_for('auth.logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="icon-btn" title="{{ t('logout') }}" aria-label="{{ t('logout') }}"><i class="fa-solid fa-right-from-bracket"></i></button></form>
+    </div>
+  </aside>
+{% endif %}
+<main class="{% if current_user.is_authenticated %}main-area{% else %}login-main{% endif %}">
+{% if current_user.is_authenticated %}
+  <header class="topbar">
+    <div class="d-flex align-items-center gap-2"><button class="icon-btn d-lg-none" id="sidebar-toggle" type="button"><i class="fa-solid fa-bars"></i></button><span class="location-label"><i class="fa-solid fa-shield-halved me-2"></i> TOTALCARE / {{ t('knowledge_studio')|upper }}</span></div>
+    <div class="d-flex align-items-center gap-3"><button class="icon-btn" id="theme-toggle" type="button" title="{{ t('switch_theme') }}" aria-label="{{ t('switch_theme') }}"><i class="fa-solid fa-{{ 'sun' if ui_theme == 'dark' else 'moon' }}"></i></button><form action="{{ url_for('main.change_language') }}" method="post" class="d-inline-flex align-items-center"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ request.full_path }}"><select name="language" class="form-select form-select-sm lang-switch" aria-label="{{ t('preferred_language') }}"><option value="en" {% if ui_lang=='en' %}selected{% endif %}>EN</option><option value="el" {% if ui_lang=='el' %}selected{% endif %}>ΕΛ</option></select></form><span class="live-dot"></span><span class="topbar-note">{{ t('ready') }}</span><span class="topbar-divider"></span><span class="topbar-user"><i class="fa-solid fa-user-circle"></i>{{ current_user.username }}</span></div>
+  </header>
+{% endif %}
+  <div class="content-area {% block content_class %}{% endblock %}">{% block content %}{% endblock %}</div>
+  <footer class="app-footer">
+    <span class="app-footer-copy">&copy; {{ footer_year }} {{ footer_owner }}</span>
+    <a class="app-footer-link" href="{{ footer_url }}" target="_blank" rel="noopener noreferrer"><i class="fa-brands fa-github"></i> GitHub</a>
+  </footer>
+</main>
+<div class="toast-container position-fixed top-0 end-0 p-4" id="toast-container" style="z-index:11000;"></div>
+<script id="db-strings" type="application/json">{{ ui_strings|tojson }}</script>
+<script id="db-flashes" type="application/json">{{ get_flashed_messages(with_categories=true)|tojson }}</script>
+<script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

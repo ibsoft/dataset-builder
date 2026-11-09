@@ -1,0 +1,3 @@
+Single initial schema migration. Run `flask --app wsgi:app db upgrade`.
+For subsequent schema changes: `flask --app wsgi:app db migrate -m "reason"`
+Review migrations and take a backup before running `db upgrade` in production.
