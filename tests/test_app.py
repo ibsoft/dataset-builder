@@ -146,6 +146,22 @@ def test_sidebar_collapse_control_is_present(login):
     assert 'nav-text' in body
 
 
+def test_delete_confirmation_modal_is_localized_and_available(login):
+    client = login()
+    _make(client)
+    for path in ('/documents/1', '/documents/1/edit'):
+        body = client.get(path).data.decode('utf-8')
+        assert 'id="delete-confirm-modal"' in body
+        assert 'aria-labelledby="delete-confirm-title"' in body
+        assert 'aria-describedby="delete-confirm-message"' in body
+        assert 'id="delete-confirm-cancel"' in body
+        assert 'id="delete-confirm-accept"' in body
+    client.post('/language', data={'language': 'el', 'next': '/'})
+    body = client.get('/documents/1').data.decode('utf-8')
+    assert 'id="delete-confirm-title">Διαγραφή</h5>' in body
+    assert 'data-bs-dismiss="modal">Ακύρωση</button>' in body
+
+
 def test_greek_translation_covers_every_page(login):
     """Every screen must render Greek chrome, not fall back to English."""
     client=login()

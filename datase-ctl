@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+SERVICE=datasetbuilder.service
+
+if [[ $# -ne 1 ]]; then
+    echo "Usage: $0 {start|stop|status|logs|update|debug}" >&2
+    exit 2
+fi
+
+case "$1" in
+    start|stop) exec sudo systemctl "$1" "$SERVICE" ;;
+    status) exec systemctl --no-pager status "$SERVICE" ;;
+    logs) exec sudo journalctl --no-pager -u "$SERVICE" -n 100 -f ;;
+    update) exec bash "$ROOT/scripts/setup.sh" update ;;
+    debug)
+        cd "$ROOT"
+        failed=0
+        echo "Application directory: $ROOT"
+        echo "Service status:"
+        systemctl --no-pager status "$SERVICE" || failed=1
+        echo
+        echo "Recent service logs:"
+        sudo journalctl --no-pager -u "$SERVICE" -n 50 || failed=1
+        echo
+        echo "Database check:"
+        env -i HOME="$HOME" PATH="/usr/local/bin:/usr/bin:/bin" APP_ENV=production \
+            "$ROOT/.venv/bin/flask" --app wsgi.py check-db || failed=1
+        echo
+        echo "HTTP health check:"
+        curl --fail --show-error --silent http://127.0.0.1:8000/healthz || failed=1
+        echo
+        exit "$failed"
+        ;;
+    *) echo "Usage: $0 {start|stop|status|logs|update|debug}" >&2; exit 2 ;;
+esac
