@@ -166,17 +166,17 @@ def test_user_management_password_fields_are_new_passwords(login):
     assert 'name="username" autocomplete="off"' in body
 
 
-def test_export_sidebar_has_localized_actions_section(login, viewer):
+def test_actions_menu_is_removed_from_sidebar(login, viewer):
     client = login()
-    for language, label in (('en', 'ACTIONS'), ('el', 'ΕΝΈΡΓΕΙΕΣ')):
+    for language in ('en', 'el'):
         client.post('/language', data={'language': language, 'next': '/'})
         body = client.get('/').data.decode('utf-8')
-        section = body.split(f'<div class="sidebar-label mt-4">{label}</div>', 1)[1]
-        assert 'id="nav-export"' in section.split('</nav>', 1)[0]
-        assert body.count('id="nav-export"') == 1
+        assert 'id="nav-export"' not in body
+        assert 'ACTIONS' not in body
+        assert 'ΕΝΈΡΓΕΙΕΣ' not in body
     body = viewer.get('/').data.decode('utf-8')
-    assert 'id="nav-export"' in body
-    assert 'ACTIONS' in body
+    assert 'id="nav-export"' not in body
+    assert 'ACTIONS' not in body
 
 
 def test_delete_confirmation_modal_is_localized_and_available(login):

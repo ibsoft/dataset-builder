@@ -611,6 +611,8 @@
 [data-theme="light"] .status-draft{background:#eceaf8;color:#4f4a86}
 [data-theme="light"] .status-in-review{background:#fdf3e0;color:#8a6416}
 [data-theme="light"] .status-archived{background:#eceef4;color:#5c6b85}
+.status-pill.rag-indexed{background:#124d39;color:#b6f4d7}
+[data-theme="light"] .status-pill.rag-indexed{background:#e3f7f0;color:#127a55}
 [data-theme="light"] .code-tag{background:#eeecfa;border-color:#d5cff5;color:#4b3fb8}
 [data-theme="light"] .page-link{background:#fff;border-color:#dde3ed;color:#4b3fb8}
 [data-theme="light"] .page-item.active .page-link{background:#5b4bd6;border-color:#5b4bd6;color:#fff}

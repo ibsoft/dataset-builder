@@ -47,6 +47,7 @@ def create_app(test_config=None):
         WTF_CSRF_TIME_LIMIT=None,
         FOOTER_OWNER=os.getenv('FOOTER_OWNER', 'DatasetBuilder'),
         FOOTER_URL=os.getenv('FOOTER_URL', 'https://github.com/ibsoft/dataset-builder'),
+        RAG_ENCRYPTION_KEY=os.getenv('RAG_ENCRYPTION_KEY', ''),
         PREFERRED_URL_SCHEME='https' if os.getenv('COOKIE_SECURE', '0') == '1' else 'http',
     )
     if test_config:
@@ -67,9 +68,11 @@ def create_app(test_config=None):
     from .views import bp as main_bp
     from .auth import bp as auth_bp
     from .admin import bp as admin_bp
+    from .rag import bp as rag_bp
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(rag_bp)
 
     @app.before_request
     def resolve_language():

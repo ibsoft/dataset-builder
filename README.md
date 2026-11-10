@@ -28,6 +28,40 @@ The metadata options require migration `0004_metadata_options`. Back up the data
 before upgrading; the native update command runs migrations automatically. Downgrading
 this migration removes the configured metadata options, but does not rewrite articles.
 
+### RAG gateway integration
+
+The optional RAG integration requires database migration `0005_rag_uploads` and a
+dedicated `RAG_ENCRYPTION_KEY` in the server's environment. Generate a Fernet key
+with `.venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`,
+store it securely in the protected `.env`, and back it up separately from the database.
+Do not rotate or lose the key without re-entering the gateway secret. Restart the
+service after changing the environment. The native update command runs migrations;
+back up the database before upgrading.
+
+Under **Settings → RAG gateway**, an administrator can enable uploads and configure
+the HTTPS gateway URL, OAuth token URL, tenant ID, client ID, client secret and
+allowed gateway subjects. The client secret is encrypted at rest; a blank secret
+retains the previous one. The OAuth client needs `documents:upload`,
+`documents:manage`, and `documents:read` for the selected tenant.
+
+Editors can open **RAG upload** on an article's detail page to upload the saved
+article or create a new gateway version, with gateway metadata. Indexing is asynchronous; the progress bar is
+indeterminate because the gateway does not expose a percentage. The detail page
+checks the gateway while the RAG modal is open, and the dashboard badge shows the last locally
+verified state. An article is marked indexed only after the gateway confirms its
+active version and checksum, metadata, and configured ACL subjects. The gateway
+administrator must grant those subjects access separately; the app only verifies
+existing grants and never replaces an ACL. Tenant membership alone is not a grant.
+The detail page displays the gateway document ID for that administration step.
+
+Changes to an article after upload mark the badge outdated. If an upload times out
+and its outcome is unknown, the app does not automatically retry: locate its document
+and latest version IDs in the gateway and use **Reconcile**. The app checks the
+gateway's external article ID and checksum before accepting the IDs. Changing the
+gateway, tenant or client configuration does not silently reuse an existing mapping.
+If the upload did not reach the gateway, an administrator can confirm **Allow retry**
+after checking the gateway; retrying an unknown upload can create a duplicate.
+
 Each article uses a unique stable ID based on the database sequence, with filenames such as `TC-KB-01-Kiosk_Communication_Lost.md` or `TC-KB-02-Απώλεια_Επικοινωνίας.md`. Spaces and punctuation become `_`, path separators are stripped, and Greek filenames/content are preserved as Unicode NFC UTF-8. Changing an article title updates the filename. Deleted articles go to a recoverable trash area (their `.md` mirror is removed).
 
 Every record remembers **Created By**, **Last Edited By**, revision number, and timestamps, embedded into the Markdown as well as stored in the database. Every save, deletion, restoration, and import becomes an immutable revision. The history screen provides previews, text diffs, downloads, and restore-as-new-version. ZIP export includes current `articles/`, deleted `trash/`, all `history/` revisions, and a UTF-8 `MANIFEST.json`. For direct RAG ingestion, use files under `articles/` only, and optionally filter on knowledge status.

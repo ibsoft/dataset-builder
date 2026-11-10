@@ -2,18 +2,18 @@
 
 Category: Banknote problem, Dispense Cassette Problem
 Device Models: APS Compact
-Knowledge Status: Draft
-Knowledge Type: Troubleshooting
+Knowledge Status: Approved
+Knowledge Type: Verified solution
 Language: English - Greek
-Operational Status: Online
+Operational Status: Degraded
 Product: APS Compact NL
 Solution Status: Verified Solution
 
 Created By: panmen
-Last Edited By: panmen
-Revision: 2
+Last Edited By: admin
+Revision: 3
 Created At: 2026-11-09T13:40:20Z
-Updated At: 2026-11-09T13:41:05Z
+Updated At: 2026-11-10T07:46:48Z
 
 ## PROBLEM DESCRIPTION
 
