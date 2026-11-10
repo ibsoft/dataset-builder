@@ -83,16 +83,19 @@ def create_app(test_config=None):
         g.ui_theme = theme if theme in ('dark', 'light') else 'dark'
 
     from .i18n import translate, translate_value, js_strings, META_UI
-    from .markdown_utils import METADATA_CHOICES
+    from .metadata_options import all_options, option_label
     @app.context_processor
     def template_context():
+        options = all_options() if current_user.is_authenticated else {}
+        lang = getattr(g, 'ui_lang', 'en')
         return {'t': lambda k: translate(k, getattr(g, 'ui_lang', 'en')),
                 't_value': lambda v: translate_value(v, getattr(g, 'ui_lang', 'en')),
+                'metadata_label': lambda field, value: option_label(options, field, value, lang),
                 'ui_lang': getattr(g, 'ui_lang', 'en'),
                 'ui_theme': getattr(g, 'ui_theme', 'dark'),
                 'ui_strings': js_strings(getattr(g, 'ui_lang', 'en')),
                 'meta_ui': META_UI,
-                'meta_choices': METADATA_CHOICES,
+                'meta_choices': {field: [option.value for option in items] for field, items in options.items()},
                 # Rendered server-side so the navigation rail has its final width
                 # on the first paint instead of being resized by JavaScript.
                 'nav_collapsed': request.cookies.get('datasetbuilder_nav') == 'collapsed',

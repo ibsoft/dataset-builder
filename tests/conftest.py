@@ -3,6 +3,9 @@ from datasetbuilder import create_app
 from datasetbuilder.models import db, User, DefaultSection
 from datasetbuilder.markdown_utils import DEFAULT_SECTIONS
 from datasetbuilder.i18n import SECTION_UI, translate
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
+from importlib import import_module
 
 @pytest.fixture()
 def app(tmp_path):
@@ -18,6 +21,11 @@ def app(tmp_path):
     # in user would leak from one request to the next.
     with app.app_context():
         db.create_all()
+        # Exercise the actual seed migration so fixtures match deployed choices.
+        db.metadata.tables['metadata_options'].drop(db.engine)
+        migration = import_module('migrations.versions.0004_metadata_options')
+        with Operations.context(MigrationContext.configure(db.session.connection())):
+            migration.upgrade()
         db.session.add_all([
             DefaultSection(title=title, title_key=title.casefold(),
                            greek_label=translate(SECTION_UI[title], 'el'), position=position)

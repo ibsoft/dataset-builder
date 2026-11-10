@@ -13,6 +13,17 @@ def utcnow():
 db = SQLAlchemy()
 
 
+class MetadataOption(db.Model):
+    __tablename__ = "metadata_options"
+    __table_args__ = (UniqueConstraint("field", "value_key", name="uq_metadata_option_field_key"),)
+    id = db.Column(db.Integer, primary_key=True)
+    field = db.Column(db.String(40), nullable=False)
+    value = db.Column(db.String(120), nullable=False)
+    value_key = db.Column(db.String(400), nullable=False)
+    greek_label = db.Column(db.String(120), nullable=False)
+    position = db.Column(db.Integer, nullable=False)
+
+
 class DefaultSection(db.Model):
     __tablename__ = "default_sections"
     id = db.Column(db.Integer, primary_key=True)

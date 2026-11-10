@@ -8,12 +8,25 @@ DatasetBuilder is a multi-user application for authoring, previewing, and versio
 
 The dark, responsive, three-panel editor offers Markdown formatting with CodeMirror (bold, italic, headings, links, ordered/unordered lists, quotes, code, code blocks, tables, undo/redo and keyboard shortcuts), a structured article outline, editable metadata, customizable sections, plus buttons between sections, one-click subsection insertion, drag-free up/down ordering, unlimited independent solutions, a full raw Markdown mode, and a **live server-rendered, HTML-sanitized preview**. Use **Ctrl/Cmd+S** to save.
 
-By default, new records prepopulate *Problem Description, Possible Symptoms, TotalCare Messages, Possible Causes, Diagnostic Procedure, Corrective Actions, Verification, Required Information for Further Diagnosis* and *Related Questions*, plus a solution template. Administrators can add, rename, translate, remove and reorder default sections under **Default sections**. The English heading is stored in Markdown; the Greek label is shown in the section picker and editor outline. Changes apply to new articles and the picker, and never rewrite existing articles. Renamed or removed custom headings in existing articles retain their saved text. Multiple solutions use a separate `## SOLUTIONS` heading and numbered `### Solution N: Name` subheadings, placed after Corrective Actions when it exists. Diagnostic `### Step ...` subheadings can be edited directly within a section.
+By default, new records prepopulate *Problem Description, Possible Symptoms, TotalCare Messages, Possible Causes, Diagnostic Procedure, Corrective Actions, Verification, Required Information for Further Diagnosis* and *Related Questions*, plus a solution template. Administrators can add, rename, translate, remove and reorder default sections under **Settings → Default sections**. The English heading is stored in Markdown; the Greek label is shown in the section picker and editor outline. Changes apply to new articles and the picker, and never rewrite existing articles. Renamed or removed custom headings in existing articles retain their saved text. Multiple solutions use a separate `## SOLUTIONS` heading and numbered `### Solution N: Name` subheadings, placed after Corrective Actions when it exists. Diagnostic `### Step ...` subheadings can be edited directly within a section.
 
 The default-section manager requires database migration `0003_default_sections`;
 run `flask --app wsgi.py db upgrade` before starting the updated application.
 The native update command runs migrations automatically. Back up the database
 before upgrading. Downgrading this migration removes configured default sections.
+
+Administrators can add, edit and remove metadata choices with English values and Greek labels under
+**Settings → Metadata options**. Knowledge type, category, operational status, knowledge status
+and solution status use these choices; saved and imported values remain intact after edits or removal.
+If a new article's usual default has been removed or renamed, the first available
+option is used instead; when no options remain, the field is left empty.
+New articles default to the language `English-Greek`. Starter categories include
+Connectivity, Hardware, Software, Configuration, Installation, Authentication,
+Performance, Security, Integration, Data and Maintenance.
+
+The metadata options require migration `0004_metadata_options`. Back up the database
+before upgrading; the native update command runs migrations automatically. Downgrading
+this migration removes the configured metadata options, but does not rewrite articles.
 
 Each article uses a unique stable ID based on the database sequence, with filenames such as `TC-KB-01-Kiosk_Communication_Lost.md` or `TC-KB-02-Απώλεια_Επικοινωνίας.md`. Spaces and punctuation become `_`, path separators are stripped, and Greek filenames/content are preserved as Unicode NFC UTF-8. Changing an article title updates the filename. Deleted articles go to a recoverable trash area (their `.md` mirror is removed).
 

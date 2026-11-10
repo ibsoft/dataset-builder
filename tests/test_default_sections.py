@@ -107,3 +107,10 @@ def test_migration_seeds_defaults_and_preserves_existing_data(tmp_path):
         sections = db.session.query(DefaultSection).order_by(DefaultSection.position).all()
         assert [section.title for section in sections] == DEFAULT_SECTIONS
         assert sections[2].greek_label == 'Μηνύματα TotalCare'
+        from datasetbuilder.models import MetadataOption
+        categories = db.session.query(MetadataOption).filter_by(field='Category').order_by(MetadataOption.position).all()
+        assert [item.value for item in categories] == [
+            'Connectivity', 'Hardware', 'Software', 'Configuration', 'Installation',
+            'Authentication', 'Performance', 'Security', 'Integration', 'Data', 'Maintenance',
+        ]
+        assert categories[0].greek_label == 'Συνδεσιμότητα'

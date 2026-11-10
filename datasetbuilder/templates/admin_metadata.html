@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}{{ t('manage_metadata') }}{% endblock %}
+{% block content %}
+<div class="wide-container">
+  <div class="page-head"><div><div class="eyebrow">{{ t('access_eyebrow')|upper }}</div><h1>{{ t('manage_metadata') }}</h1><p class="muted">{{ t('metadata_admin_help') }}</p></div></div>
+  <div class="surface form-surface mb-4">
+    <h2>{{ t('metadata_add') }}</h2>
+    <form method="post" class="row g-3 mt-1">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-3"><label class="form-label" for="option-field">{{ t('metadata_field') }}</label><select class="form-select" id="option-field" name="field" required>{% for field in options %}<option value="{{ field }}">{{ t(meta_ui.get(field, field)) }}</option>{% endfor %}</select></div>
+      <div class="col-md-3"><label class="form-label" for="option-value">{{ t('metadata_english') }}</label><input id="option-value" class="form-control" name="value" maxlength="120" required></div>
+      <div class="col-md-3"><label class="form-label" for="option-greek">{{ t('metadata_greek') }}</label><input id="option-greek" class="form-control" name="greek_label" maxlength="120" required></div>
+      <div class="col-md-3 align-self-end"><button class="btn btn-primary">{{ t('metadata_add') }}</button></div>
+    </form>
+  </div>
+  {% for field, items in options.items() %}
+  <div class="surface form-surface mb-3"><h2>{{ t(meta_ui.get(field, field)) }}</h2>
+    {% for option in items %}
+    <form id="metadata-edit-{{ option.id }}" method="post" action="{{ url_for('admin.update_metadata_option', option_id=option.id, action='save') }}" class="row g-3 align-items-end mt-1">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-4"><label class="form-label" for="metadata-value-{{ option.id }}">{{ t('metadata_english') }}</label><input id="metadata-value-{{ option.id }}" class="form-control" name="value" value="{{ option.value }}" maxlength="{{ 60 if field == 'Knowledge Status' else 120 }}" required></div>
+      <div class="col-md-4"><label class="form-label" for="metadata-greek-{{ option.id }}">{{ t('metadata_greek') }}</label><input id="metadata-greek-{{ option.id }}" class="form-control" name="greek_label" value="{{ option.greek_label }}" maxlength="120" required></div>
+      <div class="col-md-4 d-flex gap-2"><button class="btn btn-primary">{{ t('save') }}</button><button type="submit" form="metadata-delete-{{ option.id }}" class="btn btn-outline-danger">{{ t('delete') }}</button></div>
+    </form>
+    <form id="metadata-delete-{{ option.id }}" method="post" action="{{ url_for('admin.update_metadata_option', option_id=option.id, action='delete') }}" data-confirm-delete="{{ t('metadata_option_delete_confirm') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"></form>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
