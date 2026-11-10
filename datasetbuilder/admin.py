@@ -4,7 +4,8 @@ from flask import Blueprint, abort, flash, g, redirect, render_template, request
 from flask_login import login_required, current_user
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
-from .models import db, User, DefaultSection
+from .models import db, User, DefaultSection, MetadataOption
+from .metadata_options import all_options, FIELD_LIMITS
 from .services import log_audit
 from .i18n import translate
 from .csv_export import csv_response
@@ -16,6 +17,79 @@ bp = Blueprint('admin', __name__, url_prefix='/admin')
 def admin_only():
     if not current_user.is_admin():
         abort(403)
+
+
+def metadata_option_values(field):
+    value = unicodedata.normalize('NFC', request.form.get('value', '').strip())
+    greek = unicodedata.normalize('NFC', request.form.get('greek_label', '').strip())
+    if (field not in FIELD_LIMITS or not value or not greek
+            or len(value) > FIELD_LIMITS.get(field, 0) or len(greek) > 120
+            or len(value.splitlines()) != 1 or len(greek.splitlines()) != 1
+            or any(unicodedata.category(char).startswith('C') for char in value + greek)):
+        return None
+    return value, greek
+
+
+@bp.route('/metadata', methods=['GET', 'POST'])
+@login_required
+def metadata():
+    admin_only()
+    if request.method == 'POST':
+        field = request.form.get('field', '')
+        values = metadata_option_values(field)
+        if values is None:
+            flash(translate('metadata_option_invalid', g.ui_lang), 'error')
+            return redirect(url_for('.metadata'))
+        value, greek = values
+        position = db.session.query(func.max(MetadataOption.position)).filter_by(field=field).scalar()
+        db.session.add(MetadataOption(field=field, value=value, value_key=value.casefold(),
+                                      greek_label=greek, position=0 if position is None else position + 1))
+        log_audit(current_user, 'create_metadata_option', None, f'{field}: {value}')
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            if not db.session.query(MetadataOption).filter_by(field=field, value_key=value.casefold()).first():
+                raise
+            flash(translate('metadata_option_duplicate', g.ui_lang), 'error')
+            return redirect(url_for('.metadata'))
+        flash(translate('metadata_option_saved', g.ui_lang), 'success')
+        return redirect(url_for('.metadata'))
+    return render_template('admin_metadata.html', options=all_options())
+
+
+@bp.post('/metadata/<int:option_id>/<action>')
+@login_required
+def update_metadata_option(option_id, action):
+    admin_only()
+    option = db.get_or_404(MetadataOption, option_id)
+    if action == 'save':
+        values = metadata_option_values(option.field)
+        if values is None:
+            flash(translate('metadata_option_invalid', g.ui_lang), 'error')
+            return redirect(url_for('.metadata'))
+        old_value = option.value
+        option.value, option.greek_label = values
+        option.value_key = option.value.casefold()
+        log_audit(current_user, 'update_metadata_option', None,
+                  f'{option.field}: {old_value} -> {option.value}')
+    elif action == 'delete':
+        log_audit(current_user, 'delete_metadata_option', None, f'{option.field}: {option.value}')
+        db.session.delete(option)
+    else:
+        abort(404)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        if action != 'save' or not db.session.query(MetadataOption).filter(
+                MetadataOption.field == option.field, MetadataOption.value_key == values[0].casefold(),
+                MetadataOption.id != option_id).first():
+            raise
+        flash(translate('metadata_option_duplicate', g.ui_lang), 'error')
+        return redirect(url_for('.metadata'))
+    flash(translate('metadata_option_updated', g.ui_lang), 'success')
+    return redirect(url_for('.metadata'))
 
 
 @bp.get('/sections')

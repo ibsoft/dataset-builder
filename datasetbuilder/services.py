@@ -2,12 +2,19 @@
 from sqlalchemy import update
 from flask import current_app, request, has_request_context
 from .models import db, Document, DocumentRevision, AuditEvent, utcnow
-from .markdown_utils import parse_markdown, make_slug, validate_title, canonicalize_markdown, normalize_choice
+from .markdown_utils import parse_markdown, make_slug, validate_title, canonicalize_markdown
 from .storage import sync_file
 
 
 class ConflictError(Exception):
     pass
+
+
+def _knowledge_status(parsed):
+    status = parsed.get("Knowledge Status", "Draft")
+    if len(status) > 60:
+        raise ValueError("Knowledge status must be at most 60 characters.")
+    return status
 
 
 def _audit(actor, action, doc, details=""):
@@ -59,7 +66,7 @@ def create_document(title, raw_markdown, actor, note="Created"):
     doc.markdown = canonicalize_markdown(raw_markdown, title, kb_id, _stamp(doc, actor, 1))
     parsed = parse_markdown(doc.markdown)["metadata"]
     doc.category = parsed.get("Category", "General")[:120]
-    doc.knowledge_status = normalize_choice("Knowledge Status", parsed.get("Knowledge Status", ""), "Draft")
+    doc.knowledge_status = _knowledge_status(parsed)
     doc.product = parsed.get("Product", "TotalCare")[:120]
     doc.language = parsed.get("Language", "English")[:40]
     _snapshot(doc, actor, "create", note)
@@ -81,7 +88,7 @@ def save_document(doc_id, title, raw_markdown, expected_revision, actor, note=""
     fields = dict(title=title, slug=make_slug(title), markdown=new_markdown,
                   updated_by_id=actor.id, updated_at=new_updated_at,
                   category=parsed.get("Category", "General")[:120],
-                  knowledge_status=normalize_choice("Knowledge Status", parsed.get("Knowledge Status", ""), "Draft"),
+                  knowledge_status=_knowledge_status(parsed),
                   product=parsed.get("Product", "TotalCare")[:120],
                   language=parsed.get("Language", "English")[:40], revision=next_revision)
     # An optimistic UPDATE is safe across concurrent workers on PostgreSQL.

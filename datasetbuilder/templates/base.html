@@ -33,9 +33,8 @@
     </nav>
     <div class="sidebar-label mt-4">{{ t('account')|upper }}</div>
     <nav class="menu">
-      <a class="menu-link {% if request.endpoint == 'main.settings' %}active{% endif %}" href="{{ url_for('main.settings') }}" title="{{ t('settings') }}"><i class="fa-solid fa-sliders"></i> <span class="nav-text">{{ t('settings') }}</span></a>
+      <a class="menu-link {% if request.endpoint in ['main.settings', 'admin.sections', 'admin.metadata'] %}active{% endif %}" href="{{ url_for('main.settings') }}" title="{{ t('settings') }}"><i class="fa-solid fa-sliders"></i> <span class="nav-text">{{ t('settings') }}</span></a>
       {% if current_user.is_admin() %}<a class="menu-link {% if request.endpoint == 'admin.users' %}active{% endif %}" href="{{ url_for('admin.users') }}" title="{{ t('users') }}"><i class="fa-solid fa-users-gear"></i> <span class="nav-text">{{ t('users') }}</span></a>{% endif %}
-      {% if current_user.is_admin() %}<a class="menu-link {% if request.endpoint == 'admin.sections' %}active{% endif %}" href="{{ url_for('admin.sections') }}" title="{{ t('manage_sections') }}"><i class="fa-solid fa-list-check"></i> <span class="nav-text">{{ t('manage_sections') }}</span></a>{% endif %}
     </nav>
     <div class="sidebar-footer">
       <div class="user-avatar">{{ current_user.display_name[:1]|upper }}</div>

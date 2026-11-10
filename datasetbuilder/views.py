@@ -13,8 +13,8 @@ from sqlalchemy import or_
 from .models import db, Document, DocumentRevision, DefaultSection
 from .csv_export import csv_response
 from .access import can_read, get_document, get_revision
-from .markdown_utils import (METADATA, parse_markdown,
-                             build_markdown, render_preview, KNOWLEDGE_STATUS_VALUES)
+from .markdown_utils import METADATA, parse_markdown, build_markdown, render_preview
+from .metadata_options import all_options
 from .services import (ConflictError, create_document, save_document, delete_document,
                        undelete_document, restore_revision, log_audit)
 from .i18n import translate, SECTION_UI
@@ -57,7 +57,7 @@ def _filtered_documents():
         pattern = f'%{q}%'
         query = query.filter(or_(Document.title.ilike(pattern), Document.markdown.ilike(pattern),
                                  Document.category.ilike(pattern), Document.product.ilike(pattern)))
-    if status in KNOWLEDGE_STATUS_VALUES:
+    if status:
         query = query.filter(Document.knowledge_status == status)
     return query
 
@@ -73,8 +73,15 @@ def dashboard():
     total = db.session.query(Document).filter(Document.deleted_at.is_(None)).count()
     published = db.session.query(Document).filter(Document.deleted_at.is_(None),
         Document.knowledge_status.in_(['Published', 'Approved'])).count()
+    statuses = [option.value for option in all_options()['Knowledge Status']]
+    for (value,) in db.session.query(Document.knowledge_status).filter(
+            Document.deleted_at.is_(None)).distinct().order_by(Document.knowledge_status):
+        if value and value not in statuses:
+            statuses.append(value)
+    if status and status not in statuses:
+        statuses.append(status)
     return render_template('dashboard.html', records=page_results, q=q,
-                           status=status, total=total, published=published)
+                           status=status, statuses=statuses, total=total, published=published)
 
 
 @bp.get('/export/articles.csv')
@@ -96,6 +103,9 @@ def export_articles_csv():
 
 def default_markdown(default_sections, title='Untitled problem', kb='TC-KB-NEW'):
     metadata = {key: default for key, default in METADATA}
+    for field, options in all_options().items():
+        if metadata[field] and metadata[field] not in [option.value for option in options]:
+            metadata[field] = options[0].value if options else ''
     sections = [{'title': section.title, 'body': ''} for section in default_sections]
     # New documents include a solution template ready to fill in.
     solutions = [{'title': 'First solution', 'body': '**Prerequisites:**\n\n**Resolution steps:**\n\n1. \n\n**Expected result:**'}]

@@ -12,7 +12,7 @@ METADATA = [
     ("Operational Status", ""),
     ("Knowledge Status", "Draft"),
     ("Solution Status", "In Progress"),
-    ("Language", "English"),
+    ("Language", "English-Greek"),
 ]
 PROVENANCE = ("Created By", "Last Edited By", "Revision", "Created At", "Updated At")
 MAX_SLUG_BYTES = 170

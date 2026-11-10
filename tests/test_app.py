@@ -285,11 +285,8 @@ def test_metadata_status_fields_are_comboboxes(login):
     """Knowledge, Solution and Operational status must be selects, not free text."""
     client=login()
     body=client.get('/documents/new').data.decode('utf-8')
-    for key in ('Knowledge Status','Solution Status','Operational Status'):
+    for key in ('Knowledge Type','Category','Knowledge Status','Solution Status','Operational Status'):
         assert f'<select class="form-select form-select-sm meta-input" data-key="{key}"' in body
-    # Fields without a fixed value list stay free-text inputs.
-    assert 'data-key="Category"' in body
-    assert '<select class="form-select form-select-sm meta-input" data-key="Category"' not in body
 
 
 def test_metadata_status_values_are_canonicalised(login,app):
