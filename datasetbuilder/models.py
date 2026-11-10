@@ -13,6 +13,34 @@ def utcnow():
 db = SQLAlchemy()
 
 
+class RagSettings(db.Model):
+    __tablename__ = "rag_settings"
+    id = db.Column(db.Integer, primary_key=True)
+    enabled = db.Column(db.Boolean, nullable=False, default=False)
+    gateway_url = db.Column(db.String(500), nullable=False, default="https://ai-gateway.unixfor.gr")
+    token_url = db.Column(db.String(500), nullable=False, default="")
+    tenant_id = db.Column(db.String(255), nullable=False, default="")
+    client_id = db.Column(db.String(255), nullable=False, default="")
+    secret_ciphertext = db.Column(db.Text, nullable=False, default="")
+    subjects = db.Column(db.Text, nullable=False, default="")
+
+
+class RagUpload(db.Model):
+    __tablename__ = "rag_uploads"
+    document_id = db.Column(db.Integer, db.ForeignKey("documents.id", ondelete="CASCADE"), primary_key=True)
+    destination = db.Column(db.String(64), nullable=False)
+    remote_document_id = db.Column(db.String(36))
+    remote_version_id = db.Column(db.String(36))
+    revision = db.Column(db.Integer)
+    metadata_json = db.Column(db.Text, nullable=False, default="{}")
+    subjects_hash = db.Column(db.String(64), nullable=False, default="")
+    checksum = db.Column(db.String(64), nullable=False, default="")
+    state = db.Column(db.String(30), nullable=False, default="not_uploaded")
+    error = db.Column(db.String(500), nullable=False, default="")
+    updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+    document = db.relationship("Document", backref=db.backref("rag_upload", uselist=False, lazy="select"))
+
+
 class MetadataOption(db.Model):
     __tablename__ = "metadata_options"
     __table_args__ = (UniqueConstraint("field", "value_key", name="uq_metadata_option_field_key"),)

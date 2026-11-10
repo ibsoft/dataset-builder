@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}{{ t('rag_settings') }}{% endblock %}
+{% block content %}
+<div class="wide-container">
+  <div class="page-head"><div><a class="back-link" href="{{ url_for('main.settings') }}">{{ t('settings') }}</a><h1>{{ t('rag_settings') }}</h1><p class="muted">{{ t('rag_settings_help') }}</p></div></div>
+  <form class="surface form-surface" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="enabled" id="rag-enabled" {% if config and config.enabled %}checked{% endif %}><label class="form-check-label" for="rag-enabled">{{ t('rag_enable') }}</label></div>
+    <div class="mb-3"><label class="form-label" for="gateway-url">{{ t('rag_gateway_url') }}</label><input class="form-control" id="gateway-url" name="gateway_url" type="url" required maxlength="500" value="{{ config.gateway_url if config else 'https://ai-gateway.unixfor.gr' }}"></div>
+    <div class="mb-3"><label class="form-label" for="token-url">{{ t('rag_token_url') }}</label><input class="form-control" id="token-url" name="token_url" type="url" required maxlength="500" value="{{ config.token_url if config else '' }}"></div>
+    <div class="mb-3"><label class="form-label" for="tenant-id">{{ t('rag_tenant') }}</label><input class="form-control" id="tenant-id" name="tenant_id" required maxlength="255" value="{{ config.tenant_id if config else '' }}"></div>
+    <div class="mb-3"><label class="form-label" for="client-id">{{ t('rag_client') }}</label><input class="form-control" id="client-id" name="client_id" required maxlength="255" value="{{ config.client_id if config else '' }}"></div>
+    <div class="mb-3"><label class="form-label" for="client-secret">{{ t('rag_secret') }}</label><input class="form-control" id="client-secret" name="client_secret" type="password" maxlength="4096" autocomplete="new-password"><small class="muted">{{ t('rag_secret_help') }}</small></div>
+    <div class="mb-3"><label class="form-label" for="rag-subjects">{{ t('rag_subjects') }}</label><textarea class="form-control" id="rag-subjects" name="subjects" rows="4" required>{{ config.subjects if config else '' }}</textarea><small class="muted">{{ t('rag_subjects_help') }}</small></div>
+    <button class="btn btn-primary">{{ t('save') }}</button>
+  </form>
+</div>
+{% endblock %}

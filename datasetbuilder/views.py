@@ -10,6 +10,7 @@ from flask import (Blueprint, abort, current_app, flash, g, jsonify, session,
                    redirect, render_template, request, send_file, url_for)
 from flask_login import current_user, login_required
 from sqlalchemy import or_
+from sqlalchemy.orm import selectinload
 from .models import db, Document, DocumentRevision, DefaultSection
 from .csv_export import csv_response
 from .access import can_read, get_document, get_revision
@@ -19,6 +20,7 @@ from .services import (ConflictError, create_document, save_document, delete_doc
                        undelete_document, restore_revision, log_audit)
 from .i18n import translate, SECTION_UI
 from .pagination import PAGE_SIZE, current_page
+from .rag import settings_row, display_state
 
 bp = Blueprint('main', __name__)
 
@@ -67,7 +69,7 @@ def _filtered_documents():
 def dashboard():
     q = request.args.get('q', '').strip()[:160]
     status = request.args.get('status', '').strip()[:60]
-    query = _filtered_documents()
+    query = _filtered_documents().options(selectinload(Document.rag_upload))
     page_results = query.order_by(Document.updated_at.desc(), Document.id.desc()).paginate(
         page=current_page(), per_page=PAGE_SIZE, error_out=False)
     total = db.session.query(Document).filter(Document.deleted_at.is_(None)).count()
@@ -81,7 +83,8 @@ def dashboard():
     if status and status not in statuses:
         statuses.append(status)
     return render_template('dashboard.html', records=page_results, q=q,
-                           status=status, statuses=statuses, total=total, published=published)
+                           status=status, statuses=statuses, total=total, published=published,
+                           rag_config=settings_row(), rag_state=display_state)
 
 
 @bp.get('/export/articles.csv')
@@ -163,7 +166,11 @@ def editor_sections(sections):
 @login_required
 def show_document(doc_id):
     doc = get_doc_or_404(doc_id)
-    return render_template('detail.html', doc=doc, preview=render_preview(doc.markdown))
+    config = settings_row()
+    rag_metadata = json.loads(doc.rag_upload.metadata_json) if doc.rag_upload else {}
+    return render_template('detail.html', doc=doc, preview=render_preview(doc.markdown),
+                           rag_config=config, rag_state=display_state(doc, config),
+                           metadata=parse_markdown(doc.markdown)['metadata'], rag_metadata=rag_metadata)
 
 
 @bp.get('/documents/<int:doc_id>/edit')

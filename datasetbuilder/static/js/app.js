@@ -19,6 +19,8 @@
   window.toastr = {success:m=>toast('success',m),error:m=>toast('error',m),warning:m=>toast('warning',m),info:m=>toast('info',m)};
   const deleteModalElement = $('#delete-confirm-modal');
   const deleteModal = bootstrap.Modal.getOrCreateInstance(deleteModalElement);
+  const defaultConfirmTitle = $('#delete-confirm-title').textContent;
+  const defaultConfirmAction = $('#delete-confirm-accept').textContent;
   let pendingDelete = null;
   let deleteAccepted = false;
   let deleteTrigger = null;
@@ -31,10 +33,12 @@
     deleteTrigger = null;
     if(resolve)resolve(deleteAccepted);
   });
-  const confirmDelete = (message) => {
+  const confirmDelete = (message, title = defaultConfirmTitle, action = defaultConfirmAction) => {
     if(pendingDelete)return Promise.resolve(false);
     deleteAccepted = false;
     deleteTrigger = document.activeElement;
+    $('#delete-confirm-title').textContent = title;
+    $('#delete-confirm-accept').textContent = action;
     $('#delete-confirm-message').textContent = message;
     return new Promise(resolve=>{pendingDelete=resolve;deleteModal.show();});
   };
@@ -71,7 +75,7 @@
   document.querySelectorAll('[data-confirm]').forEach(form=>form.addEventListener('submit',e=>{if(!confirm(form.dataset.confirm))e.preventDefault()}));
   document.querySelectorAll('[data-confirm-delete]').forEach(form=>form.addEventListener('submit',async e=>{
     e.preventDefault();
-    if(await confirmDelete(form.dataset.confirmDelete))form.submit();
+    if(await confirmDelete(form.dataset.confirmDelete, form.dataset.confirmTitle, form.dataset.confirmAction))form.submit();
   }));
   document.querySelectorAll('#nav-export,.btn[href="/export"]').forEach(a=>a.addEventListener('click',()=>toast('info',translations.preparing_export||'Preparing UTF-8 ZIP export…')));
   $('#print-document')?.addEventListener('click',()=>window.print());
