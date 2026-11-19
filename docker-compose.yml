@@ -26,11 +26,32 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://datasetbuilder:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/datasetbuilder
       KB_DIRECTORY: /app/data/knowledge_base
+      BACKUP_DIRECTORY: /app/data/backups
       RATELIMIT_STORAGE_URI: redis://redis:6379/0
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
       - knowledge_data:/app/data/knowledge_base
+      - backup_data:/app/data/backups
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks: [internal]
+  backup_scheduler:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://datasetbuilder:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/datasetbuilder
+      KB_DIRECTORY: /app/data/knowledge_base
+      BACKUP_DIRECTORY: /app/data/backups
+      RATELIMIT_STORAGE_URI: redis://redis:6379/0
+    command: ["flask", "--app", "wsgi.py", "backup-scheduler"]
+    volumes:
+      - knowledge_data:/app/data/knowledge_base
+      - backup_data:/app/data/backups
     depends_on:
       db:
         condition: service_healthy
@@ -42,3 +63,4 @@ networks:
 volumes:
   postgres_data:
   knowledge_data:
+  backup_data:

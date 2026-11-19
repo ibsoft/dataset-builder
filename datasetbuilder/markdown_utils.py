@@ -1,8 +1,15 @@
 """UTF-8, editable structured sections, loss-conscious Markdown parsing and safe preview."""
 import re
+import secrets
 import unicodedata
+from html import escape
+from urllib.parse import parse_qs, urlsplit
+from xml.etree import ElementTree
 import bleach
 import markdown as markdown_lib
+from markdown.extensions import Extension
+from markdown.inlinepatterns import InlineProcessor
+from markdown.util import AtomicString
 
 METADATA = [
     ("Knowledge Type", "Troubleshooting"),
@@ -217,10 +224,69 @@ _ALLOWED_ATTRS = {
 }
 
 
+def _youtube_video_id(url):
+    try:
+        parts = urlsplit(url)
+        if parts.scheme != 'https' or parts.netloc.lower() not in (
+                'youtu.be', 'www.youtube.com', 'youtube.com', 'm.youtube.com'):
+            return None
+        path = parts.path.strip('/').split('/')
+        if parts.netloc.lower() == 'youtu.be' and len(path) == 1:
+            video_id = path[0]
+        elif path == ['watch']:
+            values = parse_qs(parts.query).get('v', [])
+            video_id = values[0] if len(values) == 1 else ''
+        elif len(path) == 2 and path[0] in ('embed', 'shorts'):
+            video_id = path[1]
+        else:
+            return None
+        return video_id if re.fullmatch(r'[A-Za-z0-9_-]{11}', video_id) else None
+    except ValueError:
+        return None
+
+
+class _MediaInlineProcessor(InlineProcessor):
+    def __init__(self, replacements):
+        super().__init__(r'!\[([^\]\n]*)\]\(media:\s*([^\s)]+)\s*\)')
+        self.replacements = replacements
+
+    def handleMatch(self, match, data):
+        title, url = match.group(1), match.group(2)
+        video_id = _youtube_video_id(url)
+        element = ElementTree.Element('span')
+        if video_id is None:
+            element.text = AtomicString(match.group(0))
+        else:
+            token = f'DBMEDIA{secrets.token_hex(24)}'
+            element.text = AtomicString(token)
+            self.replacements[f'<span>{token}</span>'] = (
+                f'<iframe class="markdown-video" src="https://www.youtube-nocookie.com/embed/{video_id}" '
+                f'title="{escape(title or "YouTube video", quote=True)}" '
+                'loading="lazy" referrerpolicy="strict-origin-when-cross-origin" '
+                'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" '
+                'allowfullscreen></iframe>'
+            )
+        return element, match.start(0), match.end(0)
+
+
+class _MediaExtension(Extension):
+    def __init__(self, replacements):
+        super().__init__()
+        self.replacements = replacements
+
+    def extendMarkdown(self, md):
+        md.inlinePatterns.register(_MediaInlineProcessor(self.replacements), 'datasetbuilder_media', 175)
+
+
 def render_preview(source):
     """Server-side HTML preview; sanitize raw HTML and malicious Markdown URLs."""
     if not isinstance(source, str) or len(source.encode("utf-8")) > 1_850_000:
         raise ValueError("Invalid or oversized Markdown")
-    html = markdown_lib.markdown(source, extensions=["extra", "sane_lists", "nl2br", "toc"], output_format="html5")
-    return bleach.clean(html, tags=_ALLOWED_TAGS, attributes=_ALLOWED_ATTRS,
-                        protocols=["http", "https", "mailto"], strip=True)
+    replacements = {}
+    html = markdown_lib.markdown(source, extensions=["extra", "sane_lists", "nl2br", "toc",
+                                                      _MediaExtension(replacements)], output_format="html5")
+    cleaned = bleach.clean(html, tags=_ALLOWED_TAGS, attributes=_ALLOWED_ATTRS,
+                           protocols=["http", "https", "mailto"], strip=True)
+    for token, iframe in replacements.items():
+        cleaned = cleaned.replace(token, iframe)
+    return cleaned

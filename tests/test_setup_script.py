@@ -10,6 +10,7 @@ import pytest
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "setup.sh"
 CONTROL = Path(__file__).resolve().parents[1] / "datase-ctl"
 NGINX = Path(__file__).resolve().parents[1] / "scripts" / "datasetbuilder.nginx.conf"
+BACKUP_TIMER = Path(__file__).resolve().parents[1] / "scripts" / "datasetbuilder-backup.timer"
 
 
 def run(*args, cwd, env=None, check=True, input=None):
@@ -34,6 +35,7 @@ def deployment(tmp_path):
     run("git", "config", "user.name", "Test", cwd=source)
     write(source / "scripts/setup.sh", SCRIPT.read_text(encoding="utf-8"))
     write(source / "scripts/datasetbuilder.nginx.conf", NGINX.read_text(encoding="utf-8"))
+    write(source / "scripts/datasetbuilder-backup.timer", BACKUP_TIMER.read_text(encoding="utf-8"))
     write(source / "datase-ctl", CONTROL.read_text(encoding="utf-8"), executable=True)
     write(source / ".gitignore", ".env\n.venv/\n")
     write(source / "requirements.txt", "")
@@ -68,6 +70,8 @@ def deployment(tmp_path):
         'if [ "$1" = test ]; then case "$2" in -r|-d) exit 0;; -e|-L) exit 1;; esac; fi\n'
         'if [ "$1" = install ]; then case "$5" in '
         '*/datasetbuilder.service) cp "$4" .installed-unit; exit;; '
+        '*/datasetbuilder-backup.service) cp "$4" .installed-backup-unit; exit;; '
+        '*/datasetbuilder-backup.timer) cp "$4" .installed-backup-timer; exit;; '
         '*/sites-available/datasetbuilder) cp "$4" .installed-nginx; exit;; esac; fi\n'
         'if [ "$1" = ln ]; then exit 0; fi\n'
         'exec "$@"\n',
@@ -118,7 +122,11 @@ def test_update_preserves_all_local_data_and_env(deployment):
     assert not (checkout / "data/new").exists()
     assert (checkout / ".env").read_bytes() == original_env
     assert (checkout / ".service-log").read_text().splitlines() == [
+        "is-active --quiet datasetbuilder-backup.timer",
         "stop datasetbuilder.service",
+        "daemon-reload",
+        "enable datasetbuilder-backup.timer",
+        "start datasetbuilder-backup.timer",
         "start datasetbuilder.service",
         "is-active --quiet datasetbuilder.service",
     ]
@@ -137,6 +145,7 @@ def test_failed_migration_preserves_data_and_leaves_service_stopped(deployment):
     assert "service remains stopped" in result.stderr
     assert (checkout / "data/db").read_text() == "local database"
     assert (checkout / ".service-log").read_text().splitlines() == [
+        "is-active --quiet datasetbuilder-backup.timer",
         "stop datasetbuilder.service"
     ]
 
@@ -217,11 +226,17 @@ def test_setup_preserves_configuration_and_installs_service(deployment):
     assert f"EnvironmentFile={checkout}/.env" in unit
     assert "ExecStart=/usr/bin/env APP_ENV=production " in unit
     assert "--bind 127.0.0.1:8000" in unit
+    backup_unit = (checkout / ".installed-backup-unit").read_text()
+    assert f"WorkingDirectory={checkout}" in backup_unit
+    assert "backup-scheduler --once" in backup_unit
+    assert "OnCalendar=*-*-* *:*:00" in (checkout / ".installed-backup-timer").read_text()
     assert (checkout / ".service-log").read_text().splitlines() == [
         "daemon-reload",
+        "enable datasetbuilder-backup.timer",
         "enable datasetbuilder.service",
         "restart datasetbuilder.service",
         "is-active --quiet datasetbuilder.service",
+        "start datasetbuilder-backup.timer",
         "reload nginx",
     ]
     assert (checkout / ".installed-nginx").read_text() == NGINX.read_text()
@@ -242,6 +257,21 @@ def test_setup_generates_secret_for_new_configuration(deployment):
     assert (checkout / ".env").stat().st_mode & 0o077 == 0
 
 
+def test_existing_installation_can_enable_backup_scheduler(deployment):
+    _, checkout, env = deployment
+    result = run("bash", "scripts/setup.sh", "configure-backups",
+                 cwd=checkout, env=env, check=False)
+
+    assert result.returncode == 0, result.stderr
+    assert "backup-scheduler --once" in (checkout / ".installed-backup-unit").read_text()
+    assert "OnCalendar=*-*-* *:*:00" in (checkout / ".installed-backup-timer").read_text()
+    assert (checkout / ".service-log").read_text().splitlines() == [
+        "daemon-reload",
+        "enable datasetbuilder-backup.timer",
+        "start datasetbuilder-backup.timer",
+    ]
+
+
 def test_failed_merge_restores_data_and_leaves_service_stopped(deployment):
     source, checkout, env = deployment
     write(source / "new.txt", "upstream")
@@ -255,6 +285,7 @@ def test_failed_merge_restores_data_and_leaves_service_stopped(deployment):
     assert (checkout / "data/db").read_text() == "local database"
     assert (checkout / "new.txt").read_text() == "local untracked file"
     assert (checkout / ".service-log").read_text().splitlines() == [
+        "is-active --quiet datasetbuilder-backup.timer",
         "stop datasetbuilder.service"
     ]
 

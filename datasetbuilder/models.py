@@ -25,6 +25,18 @@ class RagSettings(db.Model):
     subjects = db.Column(db.Text, nullable=False, default="")
 
 
+class BackupSettings(db.Model):
+    __tablename__ = "backup_settings"
+    id = db.Column(db.Integer, primary_key=True)
+    schedule = db.Column(db.String(10), nullable=False, default="manual")
+    schedule_time = db.Column(db.String(5), nullable=False, default="02:00")
+    schedule_weekday = db.Column(db.Integer, nullable=False, default=6)
+    max_backups = db.Column(db.Integer, nullable=False, default=10)
+    last_run_at = db.Column(db.DateTime)
+    last_scheduled_key = db.Column(db.String(16))
+    last_error = db.Column(db.String(500), nullable=False, default="")
+
+
 class RagUpload(db.Model):
     __tablename__ = "rag_uploads"
     document_id = db.Column(db.Integer, db.ForeignKey("documents.id", ondelete="CASCADE"), primary_key=True)

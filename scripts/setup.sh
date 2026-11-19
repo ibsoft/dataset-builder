@@ -4,14 +4,17 @@ set -Eeuo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$ROOT"
 SERVICE=datasetbuilder.service
+BACKUP_SERVICE=datasetbuilder-backup.service
+BACKUP_TIMER=datasetbuilder-backup.timer
 MODE="${1:-install}"
 
 usage() {
-    echo "Usage: scripts/setup.sh [install [absolute-directory]|update]"
+    echo "Usage: scripts/setup.sh [install [absolute-directory]|update|configure-backups]"
 }
 
 if [[ ( "$MODE" == install && $# -gt 2 ) || ( "$MODE" != install && $# -gt 1 ) ||
-      ( "$MODE" != install && "$MODE" != configure && "$MODE" != update ) ]]; then
+      ( "$MODE" != install && "$MODE" != configure && "$MODE" != configure-backups &&
+        "$MODE" != update ) ]]; then
     usage >&2
     exit 2
 fi
@@ -33,8 +36,11 @@ python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' || {
 }
 git rev-parse --is-inside-work-tree >/dev/null
 lock_file="$(git rev-parse --git-path datasetbuilder-setup.lock)"
-exec 9>"$lock_file"
-flock -n 9 || { echo "Another setup or update is already running." >&2; exit 1; }
+if [[ "${DATASETBUILDER_SETUP_LOCKED:-}" != 1 ]]; then
+    exec 9>"$lock_file"
+    flock -n 9 || { echo "Another setup or update is already running." >&2; exit 1; }
+fi
+export DATASETBUILDER_SETUP_LOCKED=1
 
 step() {
     if [[ -t 1 ]]; then
@@ -188,8 +194,15 @@ fi
 
 if [[ "$MODE" == configure ]]; then
     unit_path="/etc/systemd/system/$SERVICE"
+    backup_unit_path="/etc/systemd/system/$BACKUP_SERVICE"
+    backup_timer_path="/etc/systemd/system/$BACKUP_TIMER"
     if sudo test -e "$unit_path" || sudo test -L "$unit_path"; then
         echo "Refusing to overwrite an existing service: $unit_path" >&2
+        exit 1
+    fi
+    if sudo test -e "$backup_unit_path" || sudo test -L "$backup_unit_path" ||
+       sudo test -e "$backup_timer_path" || sudo test -L "$backup_timer_path"; then
+        echo "Refusing to overwrite an existing backup scheduler unit." >&2
         exit 1
     fi
     command -v nginx >/dev/null || { echo "nginx is required." >&2; exit 1; }
@@ -222,7 +235,8 @@ PY
     run_step "Applying database migrations..." migrate
     step "Installing systemd service..."
     unit="$(mktemp)"
-    trap 'status=$?; rm -f -- "$unit"; if (( status != 0 )); then echo "Setup failed; the service may be stopped." >&2; fi' EXIT
+    backup_unit="$(mktemp)"
+    trap 'status=$?; rm -f -- "$unit" "$backup_unit"; if (( status != 0 )); then echo "Setup failed; the service may be stopped." >&2; fi' EXIT
     cat > "$unit" <<EOF
 # Managed by DatasetBuilder setup.sh
 [Unit]
@@ -242,11 +256,28 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
     sudo install -m 0644 "$unit" "$unit_path"
+    cat > "$backup_unit" <<EOF
+# Managed by DatasetBuilder setup.sh
+[Unit]
+Description=Create a scheduled DatasetBuilder backup when due
+After=network.target
+
+[Service]
+Type=oneshot
+User=$(id -un)
+WorkingDirectory=$ROOT
+EnvironmentFile=$ROOT/.env
+ExecStart=/usr/bin/env APP_ENV=production $ROOT/.venv/bin/flask --app wsgi.py backup-scheduler --once
+EOF
+    sudo install -m 0644 "$backup_unit" "$backup_unit_path"
+    sudo install -m 0644 "$ROOT/scripts/datasetbuilder-backup.timer" "$backup_timer_path"
     sudo systemctl daemon-reload
+    sudo systemctl enable "$BACKUP_TIMER"
     sudo systemctl enable "$SERVICE"
     sudo systemctl restart "$SERVICE"
     systemctl is-active --quiet "$SERVICE"
     run_step "Checking application health..." check_health
+    sudo systemctl start "$BACKUP_TIMER"
     step "Installing nginx site..."
     sudo install -m 0644 "$ROOT/scripts/datasetbuilder.nginx.conf" "$nginx_site"
     if ! sudo ln -s "$nginx_site" "$nginx_link"; then
@@ -264,6 +295,42 @@ EOF
     echo "  cd $ROOT && APP_ENV=production .venv/bin/flask --app wsgi.py create-admin"
     echo "Control the service with: $ROOT/datase-ctl {start|stop|status|logs|update|debug}"
     echo "Service: https://dataset-builder.unixfor.gr"
+    exit 0
+fi
+
+if [[ "$MODE" == configure-backups ]]; then
+    [[ -f .env && -x .venv/bin/flask ]] || {
+        echo "Install the application before configuring its backup scheduler." >&2
+        exit 1
+    }
+    backup_unit_path="/etc/systemd/system/$BACKUP_SERVICE"
+    backup_timer_path="/etc/systemd/system/$BACKUP_TIMER"
+    if sudo test -e "$backup_unit_path" || sudo test -L "$backup_unit_path" ||
+       sudo test -e "$backup_timer_path" || sudo test -L "$backup_timer_path"; then
+        echo "Refusing to overwrite an existing backup scheduler unit." >&2
+        exit 1
+    fi
+    backup_unit="$(mktemp)"
+    trap 'status=$?; rm -f -- "$backup_unit"; if (( status != 0 )); then echo "Backup scheduler setup failed." >&2; fi' EXIT
+    cat > "$backup_unit" <<EOF
+# Managed by DatasetBuilder setup.sh
+[Unit]
+Description=Create a scheduled DatasetBuilder backup when due
+After=network.target
+
+[Service]
+Type=oneshot
+User=$(id -un)
+WorkingDirectory=$ROOT
+EnvironmentFile=$ROOT/.env
+ExecStart=/usr/bin/env APP_ENV=production $ROOT/.venv/bin/flask --app wsgi.py backup-scheduler --once
+EOF
+    sudo install -m 0644 "$backup_unit" "$backup_unit_path"
+    sudo install -m 0644 "$ROOT/scripts/datasetbuilder-backup.timer" "$backup_timer_path"
+    sudo systemctl daemon-reload
+    sudo systemctl enable "$BACKUP_TIMER"
+    sudo systemctl start "$BACKUP_TIMER"
+    echo "Backup scheduler installed and enabled. Configure its schedule in Settings → Backups."
     exit 0
 fi
 
@@ -321,6 +388,7 @@ backup="$(mktemp -d "$ROOT/.datasetbuilder-update.XXXXXXXX")"
 data_saved=0
 data_existed=0
 service_start_attempted=0
+backup_timer_was_active=0
 restore_data() {
     if (( data_saved )); then
         if [[ -e data || -L data ]]; then
@@ -351,6 +419,10 @@ cleanup() {
 }
 trap cleanup EXIT
 step "Stopping the service and protecting local data..."
+if sudo systemctl is-active --quiet "$BACKUP_TIMER"; then
+    sudo systemctl stop "$BACKUP_TIMER" "$BACKUP_SERVICE"
+    backup_timer_was_active=1
+fi
 sudo systemctl stop "$SERVICE"
 if [[ -d data ]]; then
     mv -- data "$backup/data"
@@ -365,9 +437,16 @@ restore_data
 run_step "Installing Python dependencies..." install_dependencies
 validate_environment
 run_step "Applying database migrations..." migrate
+if ! sudo test -e "/etc/systemd/system/$BACKUP_TIMER"; then
+    step "Installing the backup scheduler..."
+    bash "$ROOT/scripts/setup.sh" configure-backups
+fi
 step "Starting the service..."
 service_start_attempted=1
 sudo systemctl start "$SERVICE"
 systemctl is-active --quiet "$SERVICE"
 run_step "Checking application health..." check_health
+if (( backup_timer_was_active )); then
+    sudo systemctl start "$BACKUP_TIMER"
+fi
 echo "Update complete. Check: sudo systemctl status $SERVICE"

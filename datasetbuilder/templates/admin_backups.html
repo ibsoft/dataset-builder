@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block title %}{{ t('backups') }}{% endblock %}
+{% block content %}
+<div class="wide-container">
+  <div class="page-head">
+    <div>
+      <div class="eyebrow">{{ t('administration')|upper }}</div>
+      <h1>{{ t('backups') }}</h1>
+      <p class="muted">{{ t('backup_help') }}</p>
+    </div>
+    <form method="post" action="{{ url_for('admin.create_backup') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-primary"><i class="fa-solid fa-database me-2"></i>{{ t('backup_now') }}</button>
+    </form>
+  </div>
+
+  <section class="surface form-surface mb-4">
+    <h2><i class="fa-solid fa-clock me-2"></i>{{ t('backup_schedule') }}</h2>
+    <p class="muted">{{ t('backup_schedule_help') }}</p>
+    <div class="alert {% if backup_settings.schedule == 'manual' %}alert-secondary{% else %}alert-success{% endif %}" id="backup-schedule-status" role="status">
+      <div><strong>{{ t('backup_current_schedule') }}:</strong>
+        {% if backup_settings.schedule == 'daily' %}{{ t('backup_daily') }} · {{ backup_settings.schedule_time }}
+        {% elif backup_settings.schedule == 'weekly' %}{{ t('backup_weekly') }} · {{ t('weekday_' ~ backup_settings.schedule_weekday) }} {{ backup_settings.schedule_time }}
+        {% else %}{{ t('backup_manual') }}{% endif %}
+      </div>
+      {% if next_run %}<div><strong>{{ t('backup_next_run') }}:</strong> {{ next_run.strftime('%Y-%m-%d %H:%M') }} ({{ next_run.tzname() }})</div>{% endif %}
+      <div><strong>{{ t('backup_server_time') }}:</strong> {{ server_now.strftime('%Y-%m-%d %H:%M') }} ({{ server_now.tzname() }})</div>
+      {% if backup_settings.schedule != 'manual' %}
+      <form class="mt-2" method="post" action="{{ url_for('admin.cancel_backup_schedule') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-sm btn-outline-danger"><i class="fa-solid fa-ban me-1"></i>{{ t('backup_cancel_schedule') }}</button>
+      </form>
+      {% endif %}
+    </div>
+    <form method="post" action="{{ url_for('admin.save_backup_schedule') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label" for="backup-schedule">{{ t('backup_frequency') }}</label>
+          <select class="form-select" id="backup-schedule" name="schedule">
+            <option value="manual" {% if backup_settings.schedule == 'manual' %}selected{% endif %}>{{ t('backup_manual') }}</option>
+            <option value="daily" {% if backup_settings.schedule == 'daily' %}selected{% endif %}>{{ t('backup_daily') }}</option>
+            <option value="weekly" {% if backup_settings.schedule == 'weekly' %}selected{% endif %}>{{ t('backup_weekly') }}</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="backup-time">{{ t('backup_time') }}</label>
+          <input class="form-control" id="backup-time" type="time" name="schedule_time" value="{{ backup_settings.schedule_time }}" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="backup-weekday">{{ t('backup_weekday') }}</label>
+          <select class="form-select" id="backup-weekday" name="schedule_weekday">
+            {% for day in range(7) %}
+            <option value="{{ day }}" {% if backup_settings.schedule_weekday == day %}selected{% endif %}>{{ t('weekday_' ~ day) }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12"><button class="btn btn-primary">{{ t('backup_save_schedule') }}</button></div>
+      </div>
+    </form>
+    <div class="mt-3 muted">
+      {% if backup_settings.last_run_at %}{{ t('backup_last_success') }}: {{ backup_settings.last_run_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC{% else %}{{ t('backup_never_run') }}{% endif %}
+    </div>
+    {% if backup_settings.last_error %}<p class="text-danger mt-2 mb-0">{{ t('backup_last_error') }}: {{ backup_settings.last_error }}</p>{% endif %}
+  </section>
+
+  <section class="surface form-surface">
+    <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+      <div><h2>{{ t('backup_available') }}</h2><p class="muted">{{ t('backup_retention_help') }}</p></div>
+      <a class="btn btn-outline-light-custom" href="{{ url_for('main.settings') }}">{{ t('settings') }} · {{ t('backup_retention') }}</a>
+    </div>
+    {% if backups %}
+    <div class="table-responsive mt-3">
+      <table class="table data-table align-middle">
+        <thead><tr><th>{{ t('backup_file') }}</th><th>{{ t('date') }}</th><th>{{ t('backup_size') }}</th><th></th></tr></thead>
+        <tbody>
+        {% for backup in backups %}
+          <tr>
+            <td><code>{{ backup.name }}</code></td>
+            <td>{{ backup.created_at.strftime('%Y-%m-%d %H:%M:%S') }} UTC</td>
+            <td>{{ '%.1f'|format(backup.size / 1048576) }} MB</td>
+            <td class="text-end"><a class="btn btn-sm btn-outline-light-custom" href="{{ url_for('admin.download_backup', name=backup.name) }}"><i class="fa-solid fa-download me-1"></i>{{ t('download') }}</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <form class="row g-3 align-items-end mt-2" method="post" action="{{ url_for('admin.restore_backup_action') }}" data-confirm-delete="{{ t('backup_restore_confirm') }}" data-confirm-title="{{ t('backup_restore') }}" data-confirm-action="{{ t('backup_restore') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="col-md-8">
+        <label class="form-label" for="restore-backup">{{ t('backup_choose') }}</label>
+        <select class="form-select" id="restore-backup" name="name" required>
+          {% for backup in backups %}<option value="{{ backup.name }}">{{ backup.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4"><button class="btn btn-outline-danger"><i class="fa-solid fa-clock-rotate-left me-2"></i>{{ t('backup_restore') }}</button></div>
+      <p class="muted mb-0">{{ t('backup_restore_help') }}</p>
+    </form>
+    {% else %}
+      <p class="muted mt-3">{{ t('backup_empty') }}</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

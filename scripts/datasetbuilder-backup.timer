@@ -1,0 +1,10 @@
+[Unit]
+Description=Check DatasetBuilder backup schedule
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=true
+Unit=datasetbuilder-backup.service
+
+[Install]
+WantedBy=timers.target

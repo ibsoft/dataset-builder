@@ -73,6 +73,11 @@ def test_upload_pending_then_verified_and_outdated(app, login, monkeypatch):
     configure(app, client)
     doc = create_doc(client)
     url = f"/documents/{doc['id']}/rag"
+    initial_detail = client.get(f"/documents/{doc['id']}").data.decode()
+    upload_form = initial_detail.split('data-rag-upload', 1)[1].split('</form>', 1)[0]
+    assert 'col-12 d-flex justify-content-between' in upload_form
+    assert 'Upload or update in RAG' in upload_form
+    assert 'data-bs-dismiss="modal">Close</button>' in upload_form
     payload = {'revision': str(doc['revision']), 'title': 'Gateway test',
                'manufacturer': '', 'equipment_model': '', 'language': 'en', 'description': 'Test'}
     response = client.post(url + '/upload', data=payload)
@@ -85,8 +90,12 @@ def test_upload_pending_then_verified_and_outdated(app, login, monkeypatch):
     assert 'progressbar' in detail and 'Indexing' in detail
     assert 'data-bs-target="#rag-modal"' in detail and 'id="rag-modal"' in detail
     assert 'data-rag-refresh' in detail
+    assert 'rag-success-badge' not in detail
     FakeGateway.state = 'INDEXED'
     assert client.post(url + '/refresh').status_code == 302
+    detail = client.get(f"/documents/{doc['id']}").data.decode()
+    assert 'rag-success-badge' in detail
+    assert 'Upload successful · indexed and verified' in detail
     assert 'class="status-pill rag-indexed">Indexed; access grants verified' in client.get('/').data.decode()
     response = client.put(f"/api/documents/{doc['id']}", json={
         'title': 'Gateway test', 'revision': doc['revision'], 'markdown': doc['markdown'] + '\nChanged\n',

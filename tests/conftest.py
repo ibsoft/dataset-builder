@@ -13,6 +13,7 @@ def app(tmp_path):
         'TESTING': True, 'SECRET_KEY': 'test-secret-key-with-more-than-32-characters',
         'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
         'KB_DIRECTORY': str(tmp_path / 'markdown'),
+        'BACKUP_DIRECTORY': str(tmp_path / 'backups'),
         'WTF_CSRF_ENABLED': False,
         'RATELIMIT_ENABLED': False,
     })
@@ -26,6 +27,7 @@ def app(tmp_path):
         migration = import_module('migrations.versions.0004_metadata_options')
         with Operations.context(MigrationContext.configure(db.session.connection())):
             migration.upgrade()
+            import_module('migrations.versions.0007_media_category').upgrade()
         db.session.add_all([
             DefaultSection(title=title, title_key=title.casefold(),
                            greek_label=translate(SECTION_UI[title], 'el'), position=position)

@@ -14,6 +14,62 @@ def editor_data(response):
     return json.loads(match.group(1))
 
 
+def test_new_media_has_one_section_and_default_category(app, login, viewer):
+    client = login()
+    assert 'href="/documents/new-media"' in client.get('/').data.decode()
+    assert 'href="/documents/new-media"' not in viewer.get('/').data.decode()
+    assert viewer.get('/documents/new-media').status_code == 403
+    response = client.get('/documents/new-media')
+    assert response.status_code == 200
+    data = editor_data(response)
+    assert data['parsed']['sections'] == [{'title': 'MEDIA', 'body': ''}]
+    assert data['parsed']['solutions'] == []
+    assert data['parsed']['metadata']['Category'] == 'Media'
+    assert 'value="Media" selected' in response.data.decode()
+    assert 'id="raw-insert-video"' in response.data.decode()
+    regular = editor_data(client.get('/documents/new'))
+    assert len(regular['parsed']['sections']) == len(DEFAULT_SECTIONS)
+    assert regular['parsed']['solutions']
+
+
+def test_new_media_does_not_change_configured_article_sections(app, login):
+    client = login()
+    with app.app_context():
+        items = db.session.query(DefaultSection).order_by(DefaultSection.position).all()
+        db.session.delete(items[0])
+        items[1].title = 'CUSTOM SYMPTOMS'
+        items[1].title_key = 'custom symptoms'
+        db.session.commit()
+        expected = [(item.id, item.title, item.greek_label, item.position)
+                    for item in db.session.query(DefaultSection).order_by(DefaultSection.position)]
+
+    assert client.get('/documents/new-media').status_code == 200
+    with app.app_context():
+        actual = [(item.id, item.title, item.greek_label, item.position)
+                  for item in db.session.query(DefaultSection).order_by(DefaultSection.position)]
+    assert actual == expected
+    article = editor_data(client.get('/documents/new'))['parsed']
+    assert [section['title'] for section in article['sections']] == [item[1] for item in expected]
+    assert article['solutions']
+
+
+def test_media_category_migration_preserves_existing_category(app):
+    from importlib import import_module
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from datasetbuilder.models import MetadataOption
+
+    with app.app_context():
+        option = db.session.query(MetadataOption).filter_by(field='Category', value_key='media').one()
+        option.greek_label = 'Custom label'
+        db.session.commit()
+        with Operations.context(MigrationContext.configure(db.session.connection())):
+            import_module('migrations.versions.0007_media_category').upgrade()
+        rows = db.session.query(MetadataOption).filter_by(field='Category', value_key='media').all()
+        assert len(rows) == 1
+        assert rows[0].greek_label == 'Custom label'
+
+
 def test_admin_manages_sections_without_changing_existing_articles(app, login):
     client = login()
     original = client.post('/api/documents', json={
@@ -111,6 +167,6 @@ def test_migration_seeds_defaults_and_preserves_existing_data(tmp_path):
         categories = db.session.query(MetadataOption).filter_by(field='Category').order_by(MetadataOption.position).all()
         assert [item.value for item in categories] == [
             'Connectivity', 'Hardware', 'Software', 'Configuration', 'Installation',
-            'Authentication', 'Performance', 'Security', 'Integration', 'Data', 'Maintenance',
+            'Authentication', 'Performance', 'Security', 'Integration', 'Data', 'Maintenance', 'Media',
         ]
         assert categories[0].greek_label == 'Συνδεσιμότητα'

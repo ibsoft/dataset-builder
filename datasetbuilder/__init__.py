@@ -34,6 +34,7 @@ def create_app(test_config=None):
         SQLALCHEMY_ENGINE_OPTIONS={'pool_pre_ping': True},
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         KB_DIRECTORY=os.getenv('KB_DIRECTORY', str(project_dir / 'data' / 'knowledge_base')),
+        BACKUP_DIRECTORY=os.getenv('BACKUP_DIRECTORY', str(project_dir / 'data' / 'backups')),
         KB_PREFIX='TC-KB', KB_PADDING=int(os.getenv('KB_PADDING', '2')),
         MAX_CONTENT_LENGTH=2_500_000,
         SESSION_COOKIE_HTTPONLY=True,
@@ -59,6 +60,21 @@ def create_app(test_config=None):
     elif app.config['SQLALCHEMY_DATABASE_URI'].startswith('postgresql://'):
         app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace('postgresql://', 'postgresql+psycopg://', 1)
     db.init_app(app)
+
+    @app.before_request
+    def lock_during_backup_operations():
+        from .backups import acquire_request_lock
+        g.backup_lock_descriptor = acquire_request_lock()
+
+    @app.teardown_request
+    def release_backup_request_lock(_error=None):
+        descriptor = g.pop('backup_lock_descriptor', None)
+        if descriptor is not None:
+            import fcntl
+            import os
+            fcntl.flock(descriptor, fcntl.LOCK_UN)
+            os.close(descriptor)
+
     login_manager.init_app(app)
     login_manager.login_view = 'auth.login'
     login_manager.login_message = None
@@ -116,7 +132,7 @@ def create_app(test_config=None):
         response.headers['Content-Security-Policy'] = (
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
             "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; "
-            "connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+            "connect-src 'self'; frame-src https://www.youtube-nocookie.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         )
         if 'Cache-Control' not in response.headers and request.endpoint != 'static':
             response.headers['Cache-Control'] = 'private, no-store'

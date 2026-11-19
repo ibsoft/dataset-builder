@@ -613,6 +613,8 @@
 [data-theme="light"] .status-archived{background:#eceef4;color:#5c6b85}
 .status-pill.rag-indexed{background:#124d39;color:#b6f4d7}
 [data-theme="light"] .status-pill.rag-indexed{background:#e3f7f0;color:#127a55}
+.rag-success-badge{display:inline-flex;align-items:center;padding:8px 12px;border:1px solid #23845e;border-radius:999px;background:#124d39;color:#b6f4d7;font-weight:600}
+[data-theme="light"] .rag-success-badge{border-color:#9bd7bd;background:#e3f7f0;color:#127a55}
 [data-theme="light"] .code-tag{background:#eeecfa;border-color:#d5cff5;color:#4b3fb8}
 [data-theme="light"] .page-link{background:#fff;border-color:#dde3ed;color:#4b3fb8}
 [data-theme="light"] .page-item.active .page-link{background:#5b4bd6;border-color:#5b4bd6;color:#fff}
@@ -656,6 +658,8 @@
 [data-theme="light"] .toast-header{background:#f7f9fc}
 [data-theme="light"] .dark-modal{background:#ffffff}
 [data-theme="light"] .markdown-body pre{background:#f4f6fa}
+.markdown-body img{max-width:100%;height:auto}
+.markdown-body .markdown-video{display:block;width:100%;max-width:800px;aspect-ratio:16/9;height:auto;border:0}
 [data-theme="light"] .markdown-body code{background:#eef1f7}
 [data-theme="light"] .markdown-body blockquote{background:#f7f9fc}
 [data-theme="light"] .markdown-body th{background:#f4f6fa}

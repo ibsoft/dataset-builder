@@ -33,6 +33,7 @@
   const toolset = [
     ['bold','fa-bold',t('md_bold')], ['italic','fa-italic',t('md_italic')],
     ['heading','fa-heading',t('md_heading')], ['link','fa-link',t('md_link')],
+    ['image','fa-image',t('md_image')], ['video','fa-video',t('md_video')],
     ['ul','fa-list-ul',t('md_bullet_list')], ['ol','fa-list-ol',t('md_numbered_list')],
     ['code','fa-code',t('md_inline_code')], ['codeblock','fa-laptop-code',t('md_code_block')],
     ['quote','fa-quote-left',t('md_quote')], ['table','fa-table',t('md_table')],
@@ -127,7 +128,9 @@
     const operators = {
       bold:['**','**','strong text'], italic:['*','*','emphasized text'],
       code:['`','`','code'], heading:['### ','','Heading'],
-      link:['[','](https://example.com)','link text'], ul:['- ','','list item'],
+      link:['[','](https://example.com)','link text'],
+      image:['![','](https://example.com/image.png)',t('md_image_description')], ul:['- ','','list item'],
+      video:['![','](media:https://youtu.be/fetYOHyWbY0)',t('md_video_description')],
       ol:['1. ','','list item'], quote:['> ','','quotation'],
       codeblock:['```\n','\n```','code here'],
       table:['\n| Column 1 | Column 2 |\n| --- | --- |\n| Value | Value |\n','',''],
@@ -276,13 +279,114 @@
     setTimeout(()=>rawCodeMirror.refresh(),60);
     schedulePreview();
   }
+  const drafts = [];
+  let draftIndex = -1;
+  let importing = false;
+  function captureDraft() {
+    return {markdown:getCurrentMarkdown(), title:heading.value, docId, revision, kbCode,
+      note:$('#revision-note').value, dirty};
+  }
+  function rememberDraft() {
+    if (draftIndex >= 0) Object.assign(drafts[draftIndex], captureDraft());
+  }
+  async function selectDraft(index) {
+    const draft = drafts[index];
+    const result = await window.DB.api('/api/parse', {method:'POST',body:JSON.stringify({markdown:draft.markdown})});
+    rememberDraft();
+    draftIndex = index;
+    parsed = result.parsed;
+    heading.value = draft.title;
+    docId = draft.docId; revision = draft.revision; kbCode = draft.kbCode;
+    root.dataset.id = docId || ''; root.dataset.revision = revision;
+    $('.code-tag',root).textContent = kbCode;
+    $('#revision-note').value = draft.note;
+    sections = (parsed.sections||[]).map(s=>({...s}));
+    solutions = (parsed.solutions||[]).map(s=>({...s}));
+    $$('.meta-input').forEach(input=>setMetaValue(input,parsed.metadata?.[input.dataset.key]||''));
+    activeTab='structured'; rawPanel.classList.add('d-none'); structuredPanel.classList.remove('d-none');
+    $('#mode-toggle span').textContent=t('raw');
+    $('#mode-toggle i').className='fa-solid fa-code me-2';
+    $('#save-document').textContent=t(docId?'save':'create');
+    renderBlocks(); setDirty(draft.dirty); schedulePreview();
+    $('#import-draft').value=String(index);
+  }
+  $('#import-draft').addEventListener('change', async event => {
+    if (saving || importing) { event.target.value=String(draftIndex); return; }
+    importing=true;
+    try { await selectDraft(Number(event.target.value)); }
+    catch(error) { event.target.value=String(draftIndex); window.toastr.error(error.message); }
+    finally { importing=false; }
+  });
+  $('#import-markdown-batch').addEventListener('click',()=>$('#import-markdown-batch-files').click());
+  $('#import-markdown-batch-files').addEventListener('change', async event => {
+    const files=[...event.target.files];
+    if (!files.length || saving || importing) return;
+    importing=true;
+    $('#import-markdown-batch').disabled=true;
+    try {
+      const incoming=[];
+      for (const file of files) {
+        if (!/\.(md|markdown)$/i.test(file.name) || file.size>1750000) throw new Error(file.name+': '+t('import_fields_invalid'));
+        const markdown=await file.text();
+        if (!markdown.trim()) throw new Error(file.name+': '+t('import_fields_invalid'));
+        const result=await window.DB.api('/api/parse',{method:'POST',body:JSON.stringify({markdown})});
+        incoming.push({name:file.name,markdown,title:result.parsed.title||file.name.replace(/\.(md|markdown)$/i,''),docId:null,revision:0,kbCode:'TC-KB-NEW',note:'',dirty:true});
+      }
+      if (!drafts.length) { drafts.push({name:heading.value||t('untitled'),...captureDraft()}); draftIndex=0; }
+      const first=drafts.length;
+      drafts.push(...incoming);
+      $('#import-draft').replaceChildren(...drafts.map((draft,index)=>new Option(draft.name,String(index))));
+      $('#import-queue').classList.remove('d-none');
+      await selectDraft(first);
+      window.toastr.success(t('import_fields_done'));
+    } catch(error) { window.toastr.error(error.message); }
+    finally { importing=false; $('#import-markdown-batch').disabled=false; event.target.value=''; }
+  });
+  $('#import-markdown').addEventListener('click',()=>$('#import-markdown-file').click());
+  $('#import-markdown-file').addEventListener('change', async event => {
+    const file = event.target.files[0];
+    if (!file || saving || importing) return;
+    importing=true;
+    const button = $('#import-markdown');
+    button.disabled = true;
+    try {
+      if (!/\.(md|markdown)$/i.test(file.name) || file.size > 1750000) throw new Error(t('import_fields_invalid'));
+      const markdown = await file.text();
+      if (!markdown.trim()) throw new Error(t('import_fields_invalid'));
+      const result = await window.DB.api('/api/parse', {method:'POST', body:JSON.stringify({markdown})});
+      parsed = result.parsed;
+      heading.value = parsed.title || file.name.replace(/\.(md|markdown)$/i, '');
+      sections = (parsed.sections || []).map(s=>({title:s.title,body:s.body||''}));
+      solutions = (parsed.solutions || []).map(s=>({title:s.title,body:s.body||''}));
+      $$('.meta-input').forEach(input=>setMetaValue(input,parsed.metadata?.[input.dataset.key]||''));
+      activeTab = 'structured';
+      rawPanel.classList.add('d-none');
+      structuredPanel.classList.remove('d-none');
+      $('#mode-toggle span').textContent=t('raw');
+      $('#mode-toggle i').className='fa-solid fa-code me-2';
+      renderBlocks();
+      changed();
+      window.toastr.success(t('import_fields_done'));
+    } catch (error) {
+      window.toastr.error(error.message);
+    } finally {
+      importing=false;
+      button.disabled = false;
+      event.target.value = '';
+    }
+  });
   $('#mode-toggle').addEventListener('click',()=>activeTab==='raw'?toStructured():toRaw());
+  for (const action of ['image', 'video']) {
+    const button = $(`#raw-insert-${action}`);
+    if (button) button.addEventListener('click',()=>applyEdit(rawCodeMirror,action));
+    else console.error(`Missing raw editor ${action} button; check that the editor template and JavaScript are from the same release.`);
+  }
   heading.addEventListener('input',changed);
   $$('.meta-input').forEach(input=>{input.addEventListener('input',changed);input.addEventListener('change',changed);});
-  window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+  window.addEventListener('beforeunload',e=>{if(dirty || drafts.some((draft,index)=>index!==draftIndex && draft.dirty)){e.preventDefault();e.returnValue='';}});
 
   async function save() {
-    if(saving)return;
+    if(saving || importing)return;
     const title=heading.value.trim();
     if(title.length<3){window.toastr.error(t('title_min'));heading.focus();return;}
     const markdown=getCurrentMarkdown();
@@ -302,7 +406,9 @@
       setDirty(false);
       window.toastr.success(created?t('file_created'):t('file_saved'));
       if(result.document.sync_error)window.toastr.warning(t('file_sync_problem'));
-      if(created){ location.assign(result.redirect); return; }
+      rememberDraft();
+      if (drafts.length) $('#save-document').textContent=t('save');
+      if(created && !drafts.length){ location.assign(result.redirect); return; }
       $('.code-tag',root).textContent=kbCode;
       if(activeTab==='raw') {
         const saved=rawCodeMirror.getValue().replace(/^#\s+.*$/m,`# ${kbCode}: ${title}`);

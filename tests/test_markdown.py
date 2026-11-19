@@ -1,4 +1,5 @@
 from datasetbuilder.markdown_utils import make_slug, parse_markdown, render_preview, build_markdown
+import pytest
 
 
 def test_slug_preserves_greek_and_strips_path():
@@ -32,3 +33,52 @@ def test_preview_html_sanitized():
     html=render_preview('# Hello\n\n<img src="javascript:evil()" onerror="alert(1)">')
     assert 'onerror=' not in html
     assert 'javascript:' not in html
+
+
+def test_preview_renders_markdown_images_and_sanitizes_unsafe_sources():
+    html = render_preview(
+        '![Image description](https://example.com/image.png "Image title")\n\n'
+        '![Local](/static/example.png)\n\n'
+        '![Unsafe](javascript:alert(1))\n\n'
+        '<img src="https://example.com/x.png" onerror="alert(1)">'
+    )
+    assert '<img alt="Image description" src="https://example.com/image.png" title="Image title">' in html
+    assert '<img alt="Local" src="/static/example.png">' in html
+    assert 'javascript:' not in html
+    assert 'onerror' not in html
+
+
+@pytest.mark.parametrize('url', [
+    'https://youtu.be/fetYOHyWbY0',
+    'https://www.youtube.com/watch?v=fetYOHyWbY0',
+    'https://youtube.com/shorts/fetYOHyWbY0',
+    'https://m.youtube.com/embed/fetYOHyWbY0',
+])
+def test_youtube_media_renders_player(url):
+    html = render_preview(f'![TMA Agent Configuration](media:{url}  )')
+    assert 'src="https://www.youtube-nocookie.com/embed/fetYOHyWbY0"' in html
+    assert 'title="TMA Agent Configuration"' in html
+
+
+@pytest.mark.parametrize('url', [
+    'http://youtu.be/fetYOHyWbY0', 'https://youtube.com.evil.test/watch?v=fetYOHyWbY0',
+    'https://youtube.com@evil.test/watch?v=fetYOHyWbY0',
+    'https://youtu.be/invalid', 'javascript:alert',
+])
+def test_invalid_media_remains_text_without_player(url):
+    html = render_preview(f'![Example](media:{url})')
+    assert '<iframe' not in html
+    assert '![Example](media:' in html
+
+
+def test_media_markup_does_not_bypass_sanitization_or_code_blocks():
+    html = render_preview(
+        '![&quot; onload=&quot;bad](media:https://youtu.be/fetYOHyWbY0)\n\n'
+        '<iframe src="https://evil.test"></iframe>\n\n'
+        '`![code](media:https://youtu.be/fetYOHyWbY0)`\n\n'
+        '```\n![code](media:https://youtu.be/fetYOHyWbY0)\n```'
+    )
+    assert html.count('<iframe ') == 1
+    assert 'src="https://evil.test"' not in html
+    assert '<code>![code](media:https://youtu.be/fetYOHyWbY0)</code>' in html
+    assert 'title="&amp;quot; onload=&amp;quot;bad"' in html

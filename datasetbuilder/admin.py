@@ -1,10 +1,14 @@
 from datetime import datetime, timezone
 import unicodedata
-from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, g, redirect, render_template, request, send_file, url_for
 from flask_login import login_required, current_user
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from .models import db, User, DefaultSection, MetadataOption
+from .backups import (BackupError, RETENTION_CHOICES, backup_path,
+                      create_backup as create_backup_file, list_backups,
+                      restore_backup as restore_backup_file,
+                      settings_row as backup_settings_row, next_scheduled_run)
 from .metadata_options import all_options, FIELD_LIMITS
 from .services import log_audit
 from .i18n import translate
@@ -17,6 +21,112 @@ bp = Blueprint('admin', __name__, url_prefix='/admin')
 def admin_only():
     if not current_user.is_admin():
         abort(403)
+
+
+@bp.get('/backups')
+@login_required
+def backups():
+    admin_only()
+    settings = backup_settings_row()
+    return render_template('admin_backups.html', backup_settings=settings,
+                           backups=list_backups(), next_run=next_scheduled_run(settings),
+                           server_now=datetime.now().astimezone())
+
+
+@bp.post('/backups/schedule')
+@login_required
+def save_backup_schedule():
+    admin_only()
+    schedule = request.form.get('schedule', '')
+    schedule_time = request.form.get('schedule_time', '')
+    try:
+        datetime.strptime(schedule_time, '%H:%M')
+        weekday = int(request.form.get('schedule_weekday', '-1'))
+    except ValueError:
+        flash(translate('backup_schedule_invalid', g.ui_lang), 'error')
+        return redirect(url_for('.backups'))
+    if schedule not in ('manual', 'daily', 'weekly') or not 0 <= weekday <= 6:
+        flash(translate('backup_schedule_invalid', g.ui_lang), 'error')
+        return redirect(url_for('.backups'))
+    settings = backup_settings_row()
+    if (settings.schedule, settings.schedule_time, settings.schedule_weekday) != (
+            schedule, schedule_time, weekday):
+        settings.last_scheduled_key = None
+    settings.schedule = schedule
+    settings.schedule_time = schedule_time
+    settings.schedule_weekday = weekday
+    db.session.commit()
+    flash(translate('backup_schedule_saved', g.ui_lang), 'success')
+    return redirect(url_for('.backups'))
+
+
+@bp.post('/backups/schedule/cancel')
+@login_required
+def cancel_backup_schedule():
+    admin_only()
+    settings = backup_settings_row()
+    settings.schedule = 'manual'
+    settings.last_scheduled_key = None
+    db.session.commit()
+    flash(translate('backup_schedule_cancelled', g.ui_lang), 'success')
+    return redirect(url_for('.backups'))
+
+
+@bp.post('/backups/create')
+@login_required
+def create_backup():
+    admin_only()
+    try:
+        name = create_backup_file()
+    except BackupError as exc:
+        flash(str(exc), 'error')
+    else:
+        flash(translate('backup_created', g.ui_lang), 'success')
+        return redirect(url_for('.download_backup', name=name))
+    return redirect(url_for('.backups'))
+
+
+@bp.get('/backups/<name>/download')
+@login_required
+def download_backup(name):
+    admin_only()
+    try:
+        path = backup_path(name)
+    except BackupError:
+        abort(404)
+    return send_file(path, as_attachment=True, download_name=path.name,
+                     mimetype='application/zip', max_age=0)
+
+
+@bp.post('/backups/restore')
+@login_required
+def restore_backup_action():
+    admin_only()
+    try:
+        safety_name = restore_backup_file(request.form.get('name', ''))
+    except BackupError as exc:
+        flash(str(exc), 'error')
+    else:
+        flash(translate('backup_restored', g.ui_lang) + f' {safety_name}', 'success')
+    return redirect(url_for('.backups'))
+
+
+@bp.post('/backups/retention')
+@login_required
+def save_backup_retention():
+    admin_only()
+    try:
+        value = int(request.form.get('max_backups', ''))
+    except ValueError:
+        value = -1
+    if value not in RETENTION_CHOICES:
+        flash(translate('backup_retention_invalid', g.ui_lang), 'error')
+        return redirect(url_for('main.settings'))
+    settings = backup_settings_row()
+    settings.max_backups = value
+    db.session.commit()
+    flash(translate('backup_retention_saved', g.ui_lang), 'success')
+    return redirect(url_for('main.settings'))
 
 
 def metadata_option_values(field):

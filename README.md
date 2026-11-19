@@ -6,7 +6,11 @@ DatasetBuilder is a multi-user application for authoring, previewing, and versio
 
 ## Features
 
-The dark, responsive, three-panel editor offers Markdown formatting with CodeMirror (bold, italic, headings, links, ordered/unordered lists, quotes, code, code blocks, tables, undo/redo and keyboard shortcuts), a structured article outline, editable metadata, customizable sections, plus buttons between sections, one-click subsection insertion, drag-free up/down ordering, unlimited independent solutions, a full raw Markdown mode, and a **live server-rendered, HTML-sanitized preview**. Use **Ctrl/Cmd+S** to save.
+The dark, responsive, three-panel editor offers Markdown formatting with CodeMirror (bold, italic, headings, links, images, ordered/unordered lists, quotes, code, code blocks, tables, undo/redo and keyboard shortcuts), a structured article outline, editable metadata, customizable sections, plus buttons between sections, one-click subsection insertion, drag-free up/down ordering, unlimited independent solutions, a full raw Markdown mode, and a **live server-rendered, HTML-sanitized preview**. Use **Ctrl/Cmd+S** to save.
+
+Use the image button in either editor mode, or enter `![Image description](https://example.com/image.png)` directly. Replace the placeholder URL and description with your own. Images are referenced by URL, not uploaded or included in backups; viewers' browsers fetch external HTTPS images directly, so the image host must be accessible to them and may receive requests from their browsers. Same-origin image paths are also supported.
+
+**New media** starts an article in the Media category with a single `MEDIA` section and no solutions; additional sections and solutions can be added as usual. The video button inserts `![Video description](media:https://youtu.be/fetYOHyWbY0)`. Replace the URL and description with your YouTube video. HTTPS YouTube watch, short, shorts and embed URLs render as embedded YouTube-nocookie players in previews, articles and revision views. Unsupported media URLs remain visible as text. Videos are not uploaded or backed up; viewing a player connects the browser to YouTube and requires network access. The Media category requires migration `0007_media_category`; back up the database and run `flask --app wsgi.py db upgrade` before starting the updated application.
 
 By default, new records prepopulate *Problem Description, Possible Symptoms, TotalCare Messages, Possible Causes, Diagnostic Procedure, Corrective Actions, Verification, Required Information for Further Diagnosis* and *Related Questions*, plus a solution template. Administrators can add, rename, translate, remove and reorder default sections under **Settings → Default sections**. The English heading is stored in Markdown; the Greek label is shown in the section picker and editor outline. Changes apply to new articles and the picker, and never rewrite existing articles. Renamed or removed custom headings in existing articles retain their saved text. Multiple solutions use a separate `## SOLUTIONS` heading and numbered `### Solution N: Name` subheadings, placed after Corrective Actions when it exists. Diagnostic `### Step ...` subheadings can be edited directly within a section.
 
@@ -96,6 +100,30 @@ Open `http://127.0.0.1:5000`. **Do not expose `flask run` on public networks.** 
 
 The default SQLite path is `data/datasetbuilder.sqlite` inside the project directory. The default Markdown output is `data/knowledge_base/` (configure it via `KB_DIRECTORY`). SQLite is suitable for evaluation/single-instance deployments but **PostgreSQL is strongly recommended for many concurrent editors**.
 
+## Backups, scheduling and restore
+
+Administrators can create and download backups from **Administration → Backups**.
+Each protected ZIP contains the configured database (including articles,
+revision history, metadata and user accounts) and the configured Markdown
+directory. Backups are written to `BACKUP_DIRECTORY` (default
+`data/backups`) with restrictive filesystem permissions. Keep this directory
+on persistent storage with enough free space; it is not a substitute for an
+off-host copy.
+
+Choose **Manual only**, **Daily** or **Weekly** and a server-local time on the
+backup page. Native Linux installs use a systemd timer; Docker Compose runs a
+dedicated scheduler service. Select the maximum retained count under
+**Settings → Backup retention** (3, 5, 10, 20 or 50). Rotation runs only after
+a new backup succeeds and always keeps at least one.
+
+Restore is administrator-only, accepts backups created by this installation,
+checks the archive and checksums, and requires a matching database backend and
+schema revision. It first creates a safety backup, then temporarily blocks
+application requests while replacing the database and Markdown files. SQLite
+uses the online backup API; PostgreSQL uses matching `pg_dump` and `pg_restore`
+client tools. Keep backups off the application host as well, and test recovery
+periodically.
+
 ## Native Linux service and updates
 
 On a systemd-based Linux host, run from a Git checkout as the user that should
@@ -121,8 +149,12 @@ never replaced: set `COOKIE_SECURE=1` for HTTPS if necessary. The service runs
 as the invoking user and binds to `127.0.0.1:8000`. It uses one Gunicorn worker;
 configure Redis in `.env` before using multiple workers or instances.
 Setup and updates check the local HTTP/database health endpoint before reporting
-success. The installer refuses an existing service or nginx site rather than
+success. The installer refuses existing application or backup scheduler units,
+or an nginx site, rather than
 overwriting another installation.
+If upgrading a native installation created before backup scheduling was added,
+run `./scripts/setup.sh configure-backups` once from the installed application
+directory to install and enable its backup timer.
 
 Create the first administrator if the copied database does not already have one:
 
@@ -180,10 +212,10 @@ curl http://127.0.0.1:8000/healthz
 ```
 
 3. Add an HTTPS reverse proxy. `scripts/nginx-example.conf` shows one starting configuration. Docker publishes only on `127.0.0.1:8000`; access externally via the TLS reverse proxy.
-4. Back up **both** PostgreSQL and the persistent `knowledge_data` volume. ZIP export is a portable content/history backup, **not** a replacement for a complete user/database backup.
+4. The administrator-configured scheduler stores full backups in the persistent `backup_data` volume. Also keep off-host copies of PostgreSQL and the `knowledge_data` volume for disaster recovery.
 5. Run `docker compose exec web flask --app wsgi.py sync-files` if a disk failure or interrupted mirror write ever leaves Markdown files out of sync. SQL history is authoritative.
 
-The compose setup uses PostgreSQL row-based version checks, an OS-level shared file lock, atomic rename for Markdown output, Redis-backed rate-limit storage, role-based permissions, CSRF validation, hashed passwords, encrypted/signed sessions, and defensive HTML sanitization. It is a substantial production-oriented baseline, but deployers should still add infrastructure monitoring, database backup/restore drills, HTTPS certificates, security reviews and load testing before high-assurance use.
+The compose setup uses PostgreSQL row-based version checks, an OS-level shared file lock, atomic rename for Markdown output, Redis-backed rate-limit storage, role-based permissions, CSRF validation, hashed passwords, encrypted/signed sessions, and defensive HTML sanitization. The `backup_scheduler` service reads the administrator-selected schedule and shares the persistent `backup_data` volume with the web service. It is a substantial production-oriented baseline, but deployers should still add infrastructure monitoring, database backup/restore drills, HTTPS certificates, security reviews and load testing before high-assurance use.
 
 **Note on restarts and migrations:** Run `flask db upgrade` during initial deployment and each release before sending traffic to the new version. This ZIP contains the initial Alembic revision `0001_initial`.
 

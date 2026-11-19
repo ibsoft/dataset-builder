@@ -21,6 +21,7 @@ from .services import (ConflictError, create_document, save_document, delete_doc
 from .i18n import translate, SECTION_UI
 from .pagination import PAGE_SIZE, current_page
 from .rag import settings_row, display_state
+from .backups import RETENTION_CHOICES, settings_row as backup_settings_row
 
 bp = Blueprint('main', __name__)
 
@@ -155,6 +156,19 @@ def new_document():
                            **editor_sections(sections), metadata_fields=METADATA)
 
 
+@bp.get('/documents/new-media')
+@login_required
+def new_media():
+    can_edit()
+    sections = db.session.query(DefaultSection).order_by(DefaultSection.position, DefaultSection.id).all()
+    parsed = parse_markdown(default_markdown(sections))
+    parsed['metadata']['Category'] = 'Media'
+    raw = build_markdown('Untitled media', 'TC-KB-NEW', parsed['metadata'], '',
+                         [{'title': 'MEDIA', 'body': ''}], [])
+    return render_template('editor.html', doc=None, raw=raw, parsed=parse_markdown(raw),
+                           is_new_media=True, **editor_sections(sections), metadata_fields=METADATA)
+
+
 def editor_sections(sections):
     labels = {title: translate(key, 'el') for title, key in SECTION_UI.items()} if g.ui_lang == 'el' else {}
     if g.ui_lang == 'el':
@@ -171,6 +185,18 @@ def show_document(doc_id):
     return render_template('detail.html', doc=doc, preview=render_preview(doc.markdown),
                            rag_config=config, rag_state=display_state(doc, config),
                            metadata=parse_markdown(doc.markdown)['metadata'], rag_metadata=rag_metadata)
+
+
+@bp.get('/documents/<int:doc_id>/copy')
+@login_required
+def copy_document(doc_id):
+    can_edit()
+    source = get_doc_or_404(doc_id)
+    sections = db.session.query(DefaultSection).order_by(DefaultSection.position, DefaultSection.id).all()
+    parsed = parse_markdown(source.markdown)
+    return render_template('editor.html', doc=None, raw=source.markdown, parsed=parsed,
+                           initial_title=f'{source.title[:234].rstrip()} (copy)',
+                           **editor_sections(sections), metadata_fields=METADATA)
 
 
 @bp.get('/documents/<int:doc_id>/edit')
@@ -454,7 +480,9 @@ def settings():
                             secure=current_app.config['SESSION_COOKIE_SECURE'],
                             samesite='Lax', httponly=True)
         return response
-    return render_template('settings.html')
+    return render_template('settings.html',
+                           backup_settings=backup_settings_row() if current_user.is_admin() else None,
+                           retention_choices=RETENTION_CHOICES)
 
 
 @bp.post('/api/parse')

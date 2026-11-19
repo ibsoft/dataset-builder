@@ -17,6 +17,48 @@ def test_login_and_csrf_disabled_for_tests(login):
     assert b'DatasetBuilder' in client.get('/').data
 
 
+def test_markdown_image_preview_and_saved_article(login):
+    client = login()
+    image = '![Image description](https://example.com/image.png)'
+    markdown = f'# Image article\n\n## PROBLEM DESCRIPTION\n\n{image}\n'
+    preview = client.post('/api/preview', json={'markdown': markdown})
+    assert preview.status_code == 200
+    assert '<img alt="Image description" src="https://example.com/image.png">' in preview.get_json()['html']
+
+    created = _make(client, 'Image article', markdown)
+    assert created.status_code == 201
+    document = created.get_json()['document']
+    assert image in document['markdown']
+    for path in (f"/documents/{document['id']}", f"/documents/{document['id']}/history/1"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert b'<img alt="Image description" src="https://example.com/image.png">' in response.data
+        assert "https:" in response.headers['Content-Security-Policy'].split('img-src ')[1].split(';')[0]
+    assert image.encode() in client.get(f"/documents/{document['id']}/download").data
+    editor = client.get(f"/documents/{document['id']}/edit").data.decode()
+    assert 'id="raw-insert-image"' in editor
+    assert 'Insert image' in editor
+
+
+def test_youtube_media_preview_save_and_revision(login):
+    client = login()
+    media = '![TMA Agent Configuration](media:https://youtu.be/fetYOHyWbY0  )'
+    markdown = f'# Media article\n\nCategory: Media\n\n## MEDIA\n\n{media}\n'
+    preview = client.post('/api/preview', json={'markdown': markdown})
+    assert preview.status_code == 200
+    assert 'https://www.youtube-nocookie.com/embed/fetYOHyWbY0' in preview.get_json()['html']
+    created = _make(client, 'Media article', markdown)
+    assert created.status_code == 201
+    document = created.get_json()['document']
+    assert media in document['markdown']
+    assert media.encode() in client.get(f"/documents/{document['id']}/download").data
+    for path in (f"/documents/{document['id']}", f"/documents/{document['id']}/history/1"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert b'https://www.youtube-nocookie.com/embed/fetYOHyWbY0' in response.data
+        assert 'frame-src https://www.youtube-nocookie.com' in response.headers['Content-Security-Policy']
+
+
 def test_dashboard_has_one_import_control_for_editors(login, viewer):
     client = login()
     for language in ('en', 'el'):
@@ -248,6 +290,30 @@ def test_editor_receives_localized_default_section_labels(login):
     body = client.get('/documents/new').data.decode('utf-8')
     match = re.search(r'<script id="editor-data" type="application/json">(.*?)</script>', body, re.S)
     assert json.loads(match.group(1))['section_labels'] == {}
+
+
+def test_article_can_be_copied_as_a_new_document(login, viewer):
+    client = login()
+    original = _make(client).json['document']
+    detail = client.get(f"/documents/{original['id']}").data.decode('utf-8')
+    assert f'href="/documents/{original["id"]}/copy"' in detail
+    assert 'Copy as new article' in detail
+
+    response = client.get(f"/documents/{original['id']}/copy")
+    assert response.status_code == 200
+    body = response.data.decode('utf-8')
+    match = re.search(r'<script id="editor-data" type="application/json">(.*?)</script>', body, re.S)
+    copied = json.loads(match.group(1))
+    assert copied['title'] == f"{original['title']} (copy)"
+    assert f'value="{original["title"]} (copy)"' in body
+    assert copied['markdown'] == original['markdown']
+    assert copied['id'] is None
+    assert copied['revision'] == 0
+    assert 'data-id=""' in body
+
+    viewer_body = viewer.get(f"/documents/{original['id']}").data.decode('utf-8')
+    assert f'href="/documents/{original["id"]}/copy"' not in viewer_body
+    assert viewer.get(f"/documents/{original['id']}/copy").status_code == 403
 
 
 def test_theme_toggle_persists_per_account(login,app):

@@ -7,9 +7,22 @@ from .models import db, User, Document
 from .markdown_utils import parse_markdown
 from .services import create_document
 from .storage import sync_file
+from .backups import backup_scheduler, run_scheduled_backup
 
 
 def register_commands(app):
+    @app.cli.command('backup-scheduler')
+    @click.option('--once', is_flag=True, help='Check the configured schedule once and exit.')
+    @with_appcontext
+    def run_backup_scheduler(once):
+        """Run scheduled backups, or check once for a systemd timer."""
+        if once:
+            name = run_scheduled_backup()
+            if name:
+                click.echo(f'Scheduled backup created: {name}')
+            return
+        backup_scheduler()
+
     @app.cli.command('create-admin')
     @click.option('--username', prompt=True, help='Unique login name')
     @click.option('--display-name', prompt=True, help='Name shown on revisions')
